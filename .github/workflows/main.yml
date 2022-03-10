@@ -18,7 +18,7 @@ jobs:
     - name: Build website
       run: npm run bundle
     - name: Delete essential files from .gitignore
-      run: sed -i '/index.js/d' .gitignore && set -i '/style.css/d' .gitignore
+      run: sed -i '/index.js/d' .gitignore && sed -i '/style.css/d' .gitignore
     - name: Deploy website
       uses: peaceiris/actions-gh-pages@v3
       with:
