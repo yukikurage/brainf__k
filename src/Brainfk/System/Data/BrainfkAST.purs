@@ -7,9 +7,7 @@ import Data.String.CodeUnits (fromCharArray)
 
 data Command
   = PointerIncrement Int
-  | PointerDecrement Int
   | ReferenceIncrement Int
-  | ReferenceDecrement Int
   | Output
   | Input
   | Loop Statement
@@ -17,10 +15,12 @@ data Command
 derive instance Eq Command
 derive instance Ord Command
 instance Show Command where
-  show (PointerIncrement i) = fromCharArray $ replicate i '>'
-  show (PointerDecrement i) = fromCharArray $ replicate i '<'
-  show (ReferenceIncrement i) = fromCharArray $ replicate i '+'
-  show (ReferenceDecrement i) = fromCharArray $ replicate i '-'
+  show (PointerIncrement i) =
+    if i >= 0 then fromCharArray $ replicate i '>'
+    else fromCharArray $ replicate (-i) '<'
+  show (ReferenceIncrement i) =
+    if i >= 0 then fromCharArray $ replicate i '+'
+    else fromCharArray $ replicate (-i) '-'
   show Output = "."
   show Input = ","
   show (Loop s) = "[" <> show s <> "]"

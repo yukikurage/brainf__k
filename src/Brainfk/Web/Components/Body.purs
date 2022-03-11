@@ -3,49 +3,95 @@ module Brainfk.Web.Components.Body where
 import Prelude
 
 import Brainfk.System.Exec (exec)
-import Brainfk.System.Parse (parse)
-import Brainfk.Web.Util (wrap)
+import Brainfk.System.Parse (defaultToken, kurageToken, parse)
+import Brainfk.Web.Util (css, wrap)
+import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
-import Effect.Aff.Class (class MonadAff)
-import Halogen (Component, liftAff, liftEffect)
+import Effect.Aff (Aff, Milliseconds(..), delay)
+import Halogen (Component, RefLabel(..), liftAff, liftEffect)
 import Halogen.HTML (div_, text, textarea)
+import Halogen.HTML as HH
 import Halogen.HTML.Events (onValueChange, onValueInput)
-import Halogen.HTML.Properties (rows, value)
-import Halogen.Hooks (fork, kill, put, useState)
+import Halogen.HTML.Properties (readOnly, ref, rows, value)
+import Halogen.Hooks (fork, getRef, kill, modify, modify_, put, useState)
 import Halogen.Hooks as Hooks
+import Web.DOM.Element (scrollHeight, setScrollTop)
 
-component :: forall query input output m. MonadAff m => Component query input output m
+component :: forall query input output. Component query input output Aff
 component = Hooks.component \_ _ -> Hooks.do
   inputValue /\ inputValueId <- useState ""
   outputText /\ outputTextId <- useState ""
   parseErrorText /\ parseErrorTextId <- useState ""
   runtimeErrorText /\ runtimeErrorTextId <- useState ""
-  execForkId /\ execForkIdId <- useState Nothing
+  stopEffect /\ stopEffectId <- useState $ pure unit
 
   let
+    autoScroll = do
+      outputRef <- getRef $ RefLabel "OutputRef"
+
+      liftEffect case outputRef of
+        Just r -> do
+          h <- scrollHeight r
+          setScrollTop h r
+        _ -> pure unit
+
     runBrainfk = do
-      case execForkId of
-        Just forkId -> kill forkId
-        Nothing -> pure unit
-      forkId <- fork case parse inputValue of
+      stopEffect
+      case parse defaultToken inputValue of
         Left parseError -> do
           put parseErrorTextId $ show parseError
         Right ast -> do
-          { output, result } <- liftEffect $ exec { memorySize: 1000 } "" ast
-          runtimeErrorMaybe <- liftAff result
-          case runtimeErrorMaybe of
-            Just runtimeError -> do
-              put runtimeErrorTextId $ show runtimeError
-            Nothing -> do
-              output' <- liftEffect output
-              put outputTextId output'
-      put execForkIdId $ Just forkId
+          { getOutput, waitFinish, getRuntimeError, stop } <- liftEffect
+            $ exec { memorySize: 512, chunkNum: 15000 } ""
+                ast
 
-  Hooks.pure $ div_
-    [ textarea [ value inputValue, onValueInput (put inputValueId), onValueChange (\_ -> runBrainfk), rows 10, wrap "off" ]
-    , div_ [ text "output: ", text outputText ]
+          updateForkId <- fork $ forever do
+            output <- liftEffect getOutput
+            modify_ outputTextId (\prev -> prev <> output)
+
+            autoScroll
+
+            liftAff $ delay $ Milliseconds $ 50.0
+
+          _ <- fork do
+            liftAff waitFinish
+
+            runtimeErrorMaybe <- liftEffect getRuntimeError
+            kill updateForkId
+            output <- liftEffect getOutput
+            modify_ outputTextId (\prev -> prev <> output <> "\n")
+
+            autoScroll
+
+            case runtimeErrorMaybe of
+              Just runtimeError -> do
+                put runtimeErrorTextId $ show runtimeError
+              Nothing -> put runtimeErrorTextId $ ""
+
+          put stopEffectId $ do
+            liftEffect stop
+            kill updateForkId
+
+  Hooks.pure $ HH.div_
+    [ HH.div [ css "grid grid-cols-2" ]
+        [ textarea
+            [ value inputValue
+            , onValueInput (put inputValueId)
+            , onValueChange (\_ -> runBrainfk)
+            , rows 10
+            , wrap "off"
+            , css ""
+            ]
+        , textarea
+            [ value $ outputText
+            , readOnly true
+            , rows 6
+            , css ""
+            , ref $ RefLabel "OutputRef"
+            ]
+        ]
     , div_ [ text "parse error: ", text parseErrorText ]
     , div_ [ text "runtime error: ", text runtimeErrorText ]
     ]

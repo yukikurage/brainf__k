@@ -13,8 +13,50 @@ import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (charAt, fromCharArray, length, slice)
 
-parse :: String -> Either ParseError BrainfkAST
-parse str = BrainfkAST <$> runParser (pStatement unit <* pEOF) str
+type Tokens =
+  { referenceIncrement :: String
+  , referenceDecrement :: String
+  , pointerIncrement :: String
+  , pointerDecrement :: String
+  , output :: String
+  , input :: String
+  , loopStart :: String
+  , loopEnd :: String
+  }
+
+defaultToken :: Tokens
+defaultToken =
+  { referenceIncrement: "+"
+  , referenceDecrement: "-"
+  , pointerIncrement: ">"
+  , pointerDecrement: "<"
+  , output: "."
+  , input: ","
+  , loopStart: "["
+  , loopEnd: "]"
+  }
+
+kurageToken :: Tokens
+kurageToken =
+  { referenceIncrement: "ଦ"
+  , referenceDecrement: "ନ"
+  , pointerIncrement: "ଲ"
+  , pointerDecrement: "କ"
+  , output: "ଳ"
+  , input: "ଵ"
+  , loopStart: "ଥ"
+  , loopEnd: "ଧ"
+  }
+
+{-
+ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଥ ନ ଲ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଲ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଲ ଦ ଦ ଦ ଦ ଦ କ କ କ ଧ ଲ ଳ ଲ ଦ ଦ ଳ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଳ ଳ ଦ ଦ ଦ ଳ ଲ ନ ଳ
+ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ଳ କ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଳ ନ ନ ନ ନ ନ ନ ନ ନ ଳ ଦ ଦ ଦ ଳ ନ ନ ନ ନ ନ ନ ଳ ନ ନ ନ ନ ନ ନ ନ ନ ଳ ଲ ଦ ଳ
+-}
+
+parse :: Tokens -> String -> Either ParseError BrainfkAST
+parse tokens str = BrainfkAST <$> runParser
+  (pMany pSpace *> pStatement tokens <* pEOF)
+  str
 
 pToken :: String -> Parser String
 pToken expected = do
@@ -25,8 +67,10 @@ pToken expected = do
     Just res | res == expected -> do
       put $ { input, position: position + len }
       pure expected
-    Just res -> throwError $ UnexpectedToken position (TokenString expected) $ TokenString res
-    Nothing -> throwError $ UnexpectedToken position (TokenString expected) TokenEOF
+    Just res -> throwError $ UnexpectedToken position (TokenString expected) $
+      TokenString res
+    Nothing -> throwError $ UnexpectedToken position (TokenString expected)
+      TokenEOF
 
 try :: forall a. Parser a -> Parser a
 try p = do
@@ -40,7 +84,8 @@ pEOF = do
   { input, position } <- get
   case charAt position input of
     Nothing -> pure unit
-    Just c -> throwError $ UnexpectedToken position TokenEOF $ TokenString $ fromCharArray [ c ]
+    Just c -> throwError $ UnexpectedToken position TokenEOF $ TokenString $
+      fromCharArray [ c ]
 
 pSpace :: Parser Unit
 pSpace =
@@ -58,17 +103,17 @@ pSome p = do
   xs <- pMany p
   pure $ Array.cons x xs
 
-pStatement :: Unit -> Parser Statement
-pStatement unit = pStatementCont <|> pStatementEnd
+pStatement :: Tokens -> Parser Statement
+pStatement tokens = pStatementCont <|> pStatementEnd
   where
   pStatementEnd = pure StatementEnd
   pStatementCont = do
-    command <- pCommand
-    statement <- pStatement unit
+    command <- pCommand tokens
+    statement <- pStatement tokens
     pure $ StatementCont command statement
 
-pCommand :: Parser Command
-pCommand = pCommandReferenceIncrement
+pCommand :: Tokens -> Parser Command
+pCommand tokens = pCommandReferenceIncrement
   <|> pCommandReferenceDecrement
   <|> pCommandPointerIncrement
   <|> pCommandPointerDecrement
@@ -76,14 +121,22 @@ pCommand = pCommandReferenceIncrement
   <|> pCommandInput
   <|> pCommandLoop
   where
-  pCommandReferenceIncrement = ReferenceIncrement <$> (Array.length <$> pSome (lexeme $ pToken "+"))
-  pCommandReferenceDecrement = ReferenceDecrement <$> (Array.length <$> pSome (lexeme $ pToken "-"))
-  pCommandPointerIncrement = PointerIncrement <$> (Array.length <$> pSome (lexeme $ pToken ">"))
-  pCommandPointerDecrement = PointerDecrement <$> (Array.length <$> pSome (lexeme $ pToken "<"))
-  pCommandOutput = Output <$ (lexeme $ pToken ".")
-  pCommandInput = Input <$ (lexeme $ pToken ",")
+  pCommandReferenceIncrement = ReferenceIncrement <$>
+    (Array.length <$> pSome (lexeme $ pToken tokens.referenceIncrement))
+  pCommandReferenceDecrement = ReferenceIncrement <$>
+    ( negate <<< Array.length <$> pSome
+        (lexeme $ pToken tokens.referenceDecrement)
+    )
+  pCommandPointerIncrement = PointerIncrement <$>
+    (Array.length <$> pSome (lexeme $ pToken tokens.pointerIncrement))
+  pCommandPointerDecrement = PointerIncrement <$>
+    ( negate <<< Array.length <$> pSome
+        (lexeme $ pToken tokens.pointerDecrement)
+    )
+  pCommandOutput = Output <$ (lexeme $ pToken tokens.output)
+  pCommandInput = Input <$ (lexeme $ pToken tokens.input)
   pCommandLoop = do
-    _ <- lexeme $ pToken "["
-    statement <- pStatement unit
-    _ <- lexeme $ pToken "]"
+    _ <- lexeme $ pToken tokens.loopStart
+    statement <- pStatement tokens
+    _ <- lexeme $ pToken tokens.loopEnd
     pure $ Loop statement
