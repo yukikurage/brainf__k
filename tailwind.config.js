@@ -5,6 +5,9 @@ module.exports = {
     extend: {
       fontFamily: {
         roboto: ["Roboto Mono", "monospace"],
+        bebasNeue: ["Bebas Neue", "sans-serif"],
+        ubuntuMono: ["Ubuntu Mono", "monospace"],
+        inconsolata: ["Inconsolata", "monospace"],
       },
     },
   },

@@ -7,7 +7,8 @@ import Brainfk.System.Parse (defaultToken, parse)
 import Brainfk.Web.Util (css, icon, wrap)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String.CodeUnits (slice)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff, Milliseconds(..), delay, message)
 import Halogen (Component, RefLabel(..), liftAff, liftEffect)
@@ -54,7 +55,10 @@ component = Hooks.component \_ _ -> Hooks.do
 
           updateForkId <- fork $ forever do
             output <- liftEffect getOutput
-            modify_ outputTextId (\prev -> prev <> output)
+            modify_ outputTextId
+              ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+                  (prev <> output)
+              )
             step <- liftEffect getStep
             put stepNumId step
 
@@ -68,7 +72,10 @@ component = Hooks.component \_ _ -> Hooks.do
             kill updateForkId
 
             output <- liftEffect getOutput
-            modify_ outputTextId (\prev -> prev <> output)
+            modify_ outputTextId
+              ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+                  (prev <> output)
+              )
             step <- liftEffect getStep
             put stepNumId step
 
@@ -86,16 +93,37 @@ component = Hooks.component \_ _ -> Hooks.do
             liftEffect stop
             kill updateForkId
 
-  Hooks.pure $ HH.div [ css "h-screen w-screen flex flex-col bg-stone-100" ]
-    [ HH.div [ css "h-14 pt-2 px-5 flex flex-row items-center" ]
-        [ button [ onClick \_ -> runBrainfk, css "py-2 px-4" ]
+  Hooks.pure $ HH.div [ css "h-screen w-screen flex flex-col bg-zinc-100" ]
+    [ HH.div [ css "h-12 bg-white px-5 flex flex-row items-center" ]
+        [ HH.div
+            [ css "flex flex-row  items-end h-auto font-inconsolata" ]
+            [ HH.div [ css "text-4xl pl-3 text-zinc-600" ]
+                [ text "Brainf" ]
+            , HH.div [ css "text-4xl text-fuchsia-600" ]
+                [ text "**" ]
+            , HH.div [ css "text-4xl pr-3 text-zinc-600" ]
+                [ text "k" ]
+            , HH.div [ css "text-xl text-zinc-500" ]
+                [ text "interpreter by yukikurage" ]
+            ]
+        ]
+    , HH.div [ css "h-12 p-1 flex flex-row items-center" ]
+        [ button
+            [ onClick \_ -> runBrainfk
+            , css
+                "px-4 text-fuchsia-500 hover:text-fuchsia-600 disabled:text-fuchsia-300"
+            ]
             [ icon "fa-solid fa-play fa-xl" ]
-        , button [ onClick \_ -> stopEffect, css "py-2 px-4" ]
+        , button
+            [ onClick \_ -> stopEffect
+            , css
+                "px-4 text-fuchsia-500 hover:text-fuchsia-600 disabled:text-fuchsia-300"
+            ]
             [ icon "fa-solid fa-pause fa-xl" ]
         ]
     , HH.div
         [ css "grid grid-cols-2 flex-grow" ]
-        [ HH.div [ css "h-full flex flex-col p-3" ]
+        [ HH.div [ css "h-full flex flex-col p-1" ]
             [ textarea
                 [ value inputValue
                 , onValueInput \value -> do
@@ -111,29 +139,33 @@ component = Hooks.component \_ _ -> Hooks.do
                       resize-none
                       font-roboto
                       border-2
-                      rounded-md p-2
-                      text-lg
-                      bg-stone-50
-                      border-stone-300
-                      outline-stone-500"""
+                      rounded-sm p-2
+                      text-md
+                      bg-white
+                      text-zinc-700
+                      border-none
+                      outline-zinc-300"""
                 ]
             , div_ [ text "parse error: ", text parseErrorText ]
             ]
-        , HH.div [ css "h-full flex flex-col p-3" ]
+        , HH.div [ css "h-full flex flex-col p-1" ]
             [ textarea
                 [ value $ outputText
                 , readOnly true
+                , wrap "soft"
                 , css
                     """w-full
                       flex-grow
                       resize-none
                       font-roboto
                       border-2
-                      rounded-md p-2
-                      text-lg
-                      bg-stone-50
-                      border-stone-300
-                      outline-stone-500"""
+                      rounded-sm
+                      p-2
+                      text-md
+                      bg-white
+                      text-zinc-700
+                      border-none
+                      outline-none"""
                 , ref $ RefLabel "OutputRef"
                 ]
             , div_ [ text "steps: ", text $ show $ stepNum ]
