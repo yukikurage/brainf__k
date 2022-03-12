@@ -2,12 +2,11 @@ module Brainfk.System.Data.BrainfkAST where
 
 import Prelude
 
-import Data.Array (replicate)
-import Data.String.CodeUnits (fromCharArray)
-
 data Command
-  = PointerIncrement Int
-  | ReferenceIncrement Int
+  = PointerIncrement
+  | PointerDecrement
+  | ReferenceIncrement
+  | ReferenceDecrement
   | Output
   | Input
   | Loop Statement
@@ -15,12 +14,10 @@ data Command
 derive instance Eq Command
 derive instance Ord Command
 instance Show Command where
-  show (PointerIncrement i) =
-    if i >= 0 then fromCharArray $ replicate i '>'
-    else fromCharArray $ replicate (-i) '<'
-  show (ReferenceIncrement i) =
-    if i >= 0 then fromCharArray $ replicate i '+'
-    else fromCharArray $ replicate (-i) '-'
+  show PointerIncrement = ">"
+  show PointerDecrement = "<"
+  show ReferenceIncrement = "+"
+  show ReferenceDecrement = "-"
   show Output = "."
   show Input = ","
   show (Loop s) = "[" <> show s <> "]"

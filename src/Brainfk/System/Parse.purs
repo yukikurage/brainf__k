@@ -67,24 +67,34 @@ pToken expected = do
     Just res | res == expected -> do
       put $ { input, position: position + len }
       pure expected
-    Just res -> throwError $ UnexpectedToken position (TokenString expected) $
+    Just res -> throwError $ UnexpectedToken position [ TokenString expected ] $
       TokenString res
-    Nothing -> throwError $ UnexpectedToken position (TokenString expected)
+    Nothing -> throwError $ UnexpectedToken position [ TokenString expected ]
       TokenEOF
+
+lookForeword :: forall a. Parser a -> Parser a
+lookForeword p = do
+  prev <- get
+  res <- catchError p \e -> do
+    put prev
+    throwError e
+  put prev
+  pure res
 
 try :: forall a. Parser a -> Parser a
 try p = do
   prev <- get
-  catchError p \e -> do
+  res <- catchError p \e -> do
     put prev
     throwError e
+  pure res
 
 pEOF :: Parser Unit
 pEOF = do
   { input, position } <- get
   case charAt position input of
     Nothing -> pure unit
-    Just c -> throwError $ UnexpectedToken position TokenEOF $ TokenString $
+    Just c -> throwError $ UnexpectedToken position [ TokenEOF ] $ TokenString $
       fromCharArray [ c ]
 
 pSpace :: Parser Unit
@@ -104,9 +114,14 @@ pSome p = do
   pure $ Array.cons x xs
 
 pStatement :: Tokens -> Parser Statement
-pStatement tokens = pStatementCont <|> pStatementEnd
+pStatement tokens = pStatementEnd <|> pStatementCont
   where
-  pStatementEnd = pure StatementEnd
+  pStatementEnd = StatementEnd <$
+    ( pEOF <|>
+        ( unit <$
+            (lookForeword $ lexeme $ pToken $ tokens.loopEnd)
+        )
+    )
   pStatementCont = do
     command <- pCommand tokens
     statement <- pStatement tokens
@@ -121,21 +136,17 @@ pCommand tokens = pCommandReferenceIncrement
   <|> pCommandInput
   <|> pCommandLoop
   where
-  pCommandReferenceIncrement = ReferenceIncrement <$>
-    (Array.length <$> pSome (lexeme $ pToken tokens.referenceIncrement))
-  pCommandReferenceDecrement = ReferenceIncrement <$>
-    ( negate <<< Array.length <$> pSome
-        (lexeme $ pToken tokens.referenceDecrement)
-    )
-  pCommandPointerIncrement = PointerIncrement <$>
-    (Array.length <$> pSome (lexeme $ pToken tokens.pointerIncrement))
-  pCommandPointerDecrement = PointerIncrement <$>
-    ( negate <<< Array.length <$> pSome
-        (lexeme $ pToken tokens.pointerDecrement)
-    )
+  pCommandReferenceIncrement = ReferenceIncrement <$
+    (lexeme $ pToken tokens.referenceIncrement)
+  pCommandReferenceDecrement = ReferenceDecrement <$
+    (lexeme $ pToken tokens.referenceDecrement)
+  pCommandPointerIncrement = PointerIncrement <$
+    (lexeme $ pToken tokens.pointerIncrement)
+  pCommandPointerDecrement = PointerDecrement <$
+    (lexeme $ pToken tokens.pointerDecrement)
   pCommandOutput = Output <$ (lexeme $ pToken tokens.output)
   pCommandInput = Input <$ (lexeme $ pToken tokens.input)
-  pCommandLoop = do
+  pCommandLoop = try do
     _ <- lexeme $ pToken tokens.loopStart
     statement <- pStatement tokens
     _ <- lexeme $ pToken tokens.loopEnd
