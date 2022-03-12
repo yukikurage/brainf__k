@@ -128,26 +128,32 @@ pStatement tokens = pStatementEnd <|> pStatementCont
     pure $ StatementCont command statement
 
 pCommand :: Tokens -> Parser Command
-pCommand tokens = pCommandReferenceIncrement
-  <|> pCommandReferenceDecrement
-  <|> pCommandPointerIncrement
-  <|> pCommandPointerDecrement
-  <|> pCommandOutput
-  <|> pCommandInput
-  <|> pCommandLoop
-  where
-  pCommandReferenceIncrement = ReferenceIncrement <$
-    (lexeme $ pToken tokens.referenceIncrement)
-  pCommandReferenceDecrement = ReferenceDecrement <$
-    (lexeme $ pToken tokens.referenceDecrement)
-  pCommandPointerIncrement = PointerIncrement <$
-    (lexeme $ pToken tokens.pointerIncrement)
-  pCommandPointerDecrement = PointerDecrement <$
-    (lexeme $ pToken tokens.pointerDecrement)
-  pCommandOutput = Output <$ (lexeme $ pToken tokens.output)
-  pCommandInput = Input <$ (lexeme $ pToken tokens.input)
-  pCommandLoop = try do
-    _ <- lexeme $ pToken tokens.loopStart
-    statement <- pStatement tokens
-    _ <- lexeme $ pToken tokens.loopEnd
-    pure $ Loop statement
+pCommand tokens = do
+  { position } <- get
+  let
+    pCommandReferenceIncrement = ReferenceIncrement position <<< Array.length
+      <$> pSome
+        (lexeme $ pToken tokens.referenceIncrement)
+    pCommandReferenceDecrement = ReferenceDecrement position <<< Array.length
+      <$> pSome
+        (lexeme $ pToken tokens.referenceDecrement)
+    pCommandPointerIncrement = PointerIncrement position <<< Array.length <$>
+      pSome
+        (lexeme $ pToken tokens.pointerIncrement)
+    pCommandPointerDecrement = PointerDecrement position <<< Array.length <$>
+      pSome
+        (lexeme $ pToken tokens.pointerDecrement)
+    pCommandOutput = Output position <$ (lexeme $ pToken tokens.output)
+    pCommandInput = Input position <$ (lexeme $ pToken tokens.input)
+    pCommandLoop = try do
+      _ <- lexeme $ pToken tokens.loopStart
+      statement <- pStatement tokens
+      _ <- lexeme $ pToken tokens.loopEnd
+      pure $ Loop position statement
+  pCommandReferenceIncrement
+    <|> pCommandReferenceDecrement
+    <|> pCommandPointerIncrement
+    <|> pCommandPointerDecrement
+    <|> pCommandOutput
+    <|> pCommandInput
+    <|> pCommandLoop

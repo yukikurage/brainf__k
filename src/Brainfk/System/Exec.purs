@@ -55,6 +55,7 @@ exec
        , getStep :: Effect Int
        , waitFinish :: Aff (Maybe Error)
        , stop :: Effect Unit
+       , getMemory :: Effect (Array Int)
        }
 exec { memorySize, chunkNum } input (BrainfkAST ast) = do
   memory <- toEffect AST.new --メモリー
@@ -70,8 +71,8 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
     writeError :: ExecError -> Effect Unit
     writeError err = throw $ show err
 
-    incrStep :: Effect Unit
-    incrStep = Ref.modify_ (_ + 1) step
+    incrStep :: Int -> Effect Unit
+    incrStep i = Ref.modify_ (_ + i) step
 
     modifyReference :: (Int -> Int) -> Effect Unit
     modifyReference f = do
@@ -90,19 +91,16 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
       case statement of
         StatementCont command statement' -> do
           case command of
-            PointerIncrement -> liftEffect $ do
-              incrStep
-              Ref.modify_ (_ + 1) pointer
-            PointerDecrement -> liftEffect $ do
-              incrStep
-              Ref.modify_ (_ - 1) pointer
-            ReferenceIncrement -> liftEffect $ do
-              incrStep
-              modifyReference (_ + 1)
-            ReferenceDecrement -> liftEffect $ do
-              incrStep
-              modifyReference (_ - 1)
-            Loop statement'' -> do
+            ReferenceIncrement _ i -> liftEffect $ do
+              incrStep i
+              modifyReference (_ + i)
+            PointerIncrement _ i -> liftEffect $ do
+              incrStep i
+              Ref.modify_ (_ + i) pointer
+            PointerDecrement _ i -> liftEffect $ do
+              incrStep i
+              Ref.modify_ (_ - i) pointer
+            Loop _ statement'' -> do
               let
                 loop' = do
                   pointer' <- liftEffect $ Ref.read pointer
@@ -113,8 +111,11 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
                     if not isStop' then loop' else pure unit
                   else pure unit
               loop'
-            Output -> liftEffect $ do
-              incrStep
+            ReferenceDecrement _ i -> liftEffect $ do
+              incrStep i
+              modifyReference (_ - i)
+            Output _ -> liftEffect $ do
+              incrStep 1
               pointer' <- Ref.read pointer
               res <- toEffect $ AST.peek pointer' memory
               case res of
@@ -124,8 +125,8 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
                   Nothing -> writeError $ InvalidCharCode i
                 Nothing -> writeError $ OutOfMemoryRange (memorySize - 1)
                   pointer'
-            Input -> liftEffect $ do
-              incrStep
+            Input _ -> liftEffect $ do
+              incrStep 1
               inputIndex' <- liftEffect $ Ref.read inputIndex
               case charAt inputIndex' input of
                 Just c -> do
@@ -144,4 +145,5 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
     , getStep: Ref.read step
     , waitFinish: catchError (joinFiber fiber $> Nothing) (Just >>> pure)
     , stop: Ref.write true isStop
+    , getMemory: toEffect $ AST.freeze memory
     }

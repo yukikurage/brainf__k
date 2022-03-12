@@ -2,25 +2,27 @@ module Brainfk.System.Data.BrainfkAST where
 
 import Prelude
 
+import Data.Array (fold, replicate)
+
 data Command
-  = PointerIncrement
-  | PointerDecrement
-  | ReferenceIncrement
-  | ReferenceDecrement
-  | Output
-  | Input
-  | Loop Statement
+  = PointerIncrement Int Int
+  | PointerDecrement Int Int
+  | ReferenceIncrement Int Int
+  | ReferenceDecrement Int Int
+  | Output Int
+  | Input Int
+  | Loop Int Statement
 
 derive instance Eq Command
 derive instance Ord Command
 instance Show Command where
-  show PointerIncrement = ">"
-  show PointerDecrement = "<"
-  show ReferenceIncrement = "+"
-  show ReferenceDecrement = "-"
-  show Output = "."
-  show Input = ","
-  show (Loop s) = "[" <> show s <> "]"
+  show (PointerIncrement _ i) = fold $ replicate i ">"
+  show (PointerDecrement _ i) = fold $ replicate i "<"
+  show (ReferenceIncrement _ i) = fold $ replicate i "+"
+  show (ReferenceDecrement _ i) = fold $ replicate i "-"
+  show (Output _) = "."
+  show (Input _) = ","
+  show (Loop _ s) = "[" <> show s <> "]"
 
 data Statement = StatementCont Command Statement | StatementEnd
 
