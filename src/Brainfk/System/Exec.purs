@@ -41,7 +41,10 @@ instance Show ExecError where
 
 type Settings =
   { memorySize :: Int
+  , cellSize :: Int
   , chunkNum :: Int -- 1回のまとまりで処理する個数
+  , isLoopMemory :: Boolean --メモリの左端(あるいは右端)に到達したときにループするかどうか
+  , isLoopCell :: Boolean -- メモリのセルがオーバーフローしたときにループするかどうか
   }
 
 -- | Execute BrainfkAST
@@ -57,9 +60,12 @@ exec
        , stop :: Effect Unit
        , getMemory :: Effect (Array Int)
        }
-exec { memorySize, chunkNum } input (BrainfkAST ast) = do
+exec
+  { memorySize, chunkNum, isLoopMemory, isLoopCell, cellSize }
+  input
+  (BrainfkAST ast) = do
   memory <- toEffect AST.new --メモリー
-  _ <- toEffect $ replicateM (memorySize - 1) $ AST.push 0 memory -- 0埋め
+  _ <- toEffect $ replicateM memorySize $ AST.push 0 memory -- 0埋め
   pointer <- Ref.new 0 -- ポインタ
   inputIndex <- Ref.new 0 -- 入力インデックス
   log <- Ref.new Nil -- ログ
@@ -93,13 +99,26 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
           case command of
             ReferenceIncrement _ i -> liftEffect $ do
               incrStep i
-              modifyReference (_ + i)
+              modifyReference
+                ( \prev ->
+                    if isLoopCell then (prev + i) `mod` cellSize else prev + i
+                )
             PointerIncrement _ i -> liftEffect $ do
               incrStep i
-              Ref.modify_ (_ + i) pointer
+              Ref.modify_
+                ( \prev ->
+                    if isLoopMemory then (prev + i) `mod` memorySize
+                    else prev + i
+                )
+                pointer
             PointerDecrement _ i -> liftEffect $ do
               incrStep i
-              Ref.modify_ (_ - i) pointer
+              Ref.modify_
+                ( \prev ->
+                    if isLoopMemory then (prev - i) `mod` memorySize
+                    else prev - i
+                )
+                pointer
             Loop _ statement'' -> do
               let
                 loop' = do
@@ -113,7 +132,10 @@ exec { memorySize, chunkNum } input (BrainfkAST ast) = do
               loop'
             ReferenceDecrement _ i -> liftEffect $ do
               incrStep i
-              modifyReference (_ - i)
+              modifyReference
+                ( \prev ->
+                    if isLoopCell then (prev - i) `mod` cellSize else prev - i
+                )
             Output _ -> liftEffect $ do
               incrStep 1
               pointer' <- Ref.read pointer

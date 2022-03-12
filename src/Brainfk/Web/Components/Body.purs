@@ -52,7 +52,14 @@ component = Hooks.component \_ _ -> Hooks.do
           put parseErrorTextId $ show parseError
         Right ast -> do
           { getOutput, waitFinish, stop, getStep } <- liftEffect
-            $ exec { memorySize: 256, chunkNum: 15000 } inputValue
+            $ exec
+                { memorySize: 256
+                , chunkNum: 15000
+                , isLoopMemory: true
+                , isLoopCell: true
+                , cellSize: 256
+                }
+                inputValue
                 ast
 
           updateForkId <- fork $ forever do
