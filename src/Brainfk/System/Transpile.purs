@@ -6,7 +6,6 @@ import Brainfk.System.Data.BrainfkAST (BrainfkAST(..), Command(..), Statement(..
 import Brainfk.Util (setZeroTimeout)
 import Control.Promise (Promise, toAff)
 import Data.Maybe (Maybe(..))
-import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, Error)
 import Effect.Class.Console (log)
@@ -21,7 +20,7 @@ type Settings r =
 defaultSettings :: Record (Settings ())
 defaultSettings =
   { memorySize: 512
-  , chunkNum: 250000
+  , chunkNum: 300000
   , cellSize: 256
   }
 
@@ -70,56 +69,73 @@ tPrelude :: forall r. Record (Settings r) -> String -> String
 tPrelude { memorySize } input =
   "'use strict';let p=0;let m=[... new Array(" <> show memorySize
     <> ")].fill(0);let i='"
-    <> show input
+    <> input
     <>
-      "';let x=0;let o='';let z=false;let c=0;let d=(a,b)=>(a%b+b)%b;let f=()=>new Promise((v)=>{setZeroTimeout(v)();});let w=(async ()=>{"
+      "';let x=0;let o='';let z=false;let c=0;let f=async ()=>{c=0;if(z){throw new Error('Process Killed')};await new Promise((v)=>{setZeroTimeout(v)();});};let w=(async ()=>{"
 
 -- pointerPos に現在のポインターの位置をもちまわす
 -- while 文の最後にずらして補正
 tStatement
   :: forall r. Record (Settings r) -> Statement -> Int -> String
-tStatement { memorySize } (StatementEnd) pointerPos = "p=(p+" <> show pointerPos
-  <> ")%"
-  <> show memorySize
-  <> ";"
+tStatement { memorySize } (StatementEnd) pointerPos =
+  if pointerPos == 0 then ""
+  else "p=(p+" <> show pointerPos
+    <> ")%"
+    <> show memorySize
+    <> ";"
 tStatement
   settings@{ memorySize, cellSize, chunkNum }
   (StatementCont command statement)
   pointerPos =
   let
-    mkMemoryAcc = "m[(p+"
-      <> show pointerPos
-      <> ")%"
-      <> show memorySize
-      <> "]"
+    mkMemoryAcc =
+      if pointerPos == 0 then "m[p]"
+      else "m[(p+"
+        <> show pointerPos
+        <> ")%"
+        <> show memorySize
+        <> "]"
   in
     case command of
       PointerIncrement _ n -> tStatement settings statement (pointerPos + n)
       PointerDecrement _ n -> tStatement settings statement
         ((pointerPos - n) `mod` memorySize)
-      ReferenceIncrement _ n -> mkMemoryAcc <> "+=" <> show n <> ";c++;" <>
-        tStatement settings statement pointerPos
-      ReferenceDecrement _ n -> mkMemoryAcc <> "-=" <> show n <> ";c++;" <>
-        tStatement settings statement pointerPos
+      ReferenceIncrement _ n -> mkMemoryAcc <> "=(" <> mkMemoryAcc <> "+"
+        <> show n
+        <> ")%"
+        <> show cellSize
+        <> ";c++;"
+        <>
+          tStatement settings statement pointerPos
+      ReferenceDecrement _ n -> mkMemoryAcc <> "=(" <> mkMemoryAcc <> "+"
+        <> show ((-n) `mod` cellSize)
+        <> ")%"
+        <> show cellSize
+        <> ";c++;"
+        <>
+          tStatement settings statement pointerPos
       Input _ -> "if(x>=i.length){throw new Error('Exceeds Input Range')};"
         <> mkMemoryAcc
-        <> "=i.codePointAt(x);x++;c++;"
+        <> "=i.codePointAt(x);x++;"
         <> tStatement settings statement pointerPos
 
-      Output _ -> mkMemoryAcc <> "=d(" <> mkMemoryAcc <> "," <> show cellSize
-        <> ");o+=String.fromCodePoint("
+      Output _ -> "o+=String.fromCodePoint("
         <> mkMemoryAcc
-        <> ");c++;"
+        <> ");"
         <> tStatement settings statement pointerPos
-      Loop _ loopStatement -> "p=(p+" <> show pointerPos <> ")%"
-        <> show memorySize
-        <> ";while(m[p]!==0){c++;if(c>="
-        <> show chunkNum
-        <>
-          "){c=0;if(z){throw new Error('Process Killed')};await f();};"
-        <> tStatement settings loopStatement 0
-        <> "};"
-        <> tStatement settings statement 0
+      Loop _ loopStatement ->
+        ( if pointerPos == 0 then ""
+          else "p=(p+" <> show pointerPos <> ")%"
+            <> show memorySize
+            <> ";"
+        )
+          <>
+            "while(m[p]){c++;if(c>="
+          <> show chunkNum
+          <> "){await f();};"
+          <> tStatement settings loopStatement 0
+          <> "};"
+          <> tStatement settings statement 0
 
 tReturn :: String
 tReturn =
