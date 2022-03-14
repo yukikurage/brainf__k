@@ -36,7 +36,6 @@ component = Hooks.component \_ _ -> Hooks.do
   parseErrorText /\ parseErrorTextId <- useState ""
   stopEffect /\ stopEffectId <- useState $ pure unit
   isRunning /\ isRunningId <- useState false
-  stepNum /\ stepNumId <- useState 0
   isParseError /\ isParseErrorId <- useState false
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
   settings /\ settingsId <- useState defaultSettings
@@ -63,13 +62,12 @@ component = Hooks.component \_ _ -> Hooks.do
       stopEffect
       put outputTextId ""
       put parseErrorTextId ""
-      put stepNumId 0
       put isRunningId true
       case parse settings codeValue of
         Left parseError -> do
           put parseErrorTextId $ show parseError
         Right ast -> do
-          { getOutput, stop, getStep, waitFinish } <- liftEffect
+          { getOutput, stop, waitFinish } <- liftEffect
             $ exec settings ast inputValue
 
           updateForkId <- fork $ forever do
@@ -78,8 +76,6 @@ component = Hooks.component \_ _ -> Hooks.do
               ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
                   (prev <> output)
               )
-            step <- liftEffect getStep
-            put stepNumId step
 
             autoScroll
 
@@ -93,8 +89,6 @@ component = Hooks.component \_ _ -> Hooks.do
               ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
                   (prev <> output)
               )
-            step <- liftEffect getStep
-            put stepNumId step
             autoScroll
             put isRunningId false
             case runtimeErrorMaybe of
@@ -244,7 +238,6 @@ component = Hooks.component \_ _ -> Hooks.do
                         , ref $ RefLabel "OutputRef"
                         ]
                     ]
-                , div_ [ text "steps: ", text $ show $ stepNum ]
                 ]
             ]
         ]
