@@ -13,6 +13,7 @@ to generate this file without the comments in this block.
 { name = "my-project"
 , dependencies =
   [ "aff"
+  , "argonaut"
   , "arrays"
   , "console"
   , "control"
@@ -29,6 +30,7 @@ to generate this file without the comments in this block.
   , "maybe"
   , "now"
   , "prelude"
+  , "record"
   , "refs"
   , "st"
   , "strings"
@@ -36,6 +38,8 @@ to generate this file without the comments in this block.
   , "transformers"
   , "tuples"
   , "web-dom"
+  , "web-html"
+  , "web-storage"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

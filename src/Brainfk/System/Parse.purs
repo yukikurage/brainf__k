@@ -13,8 +13,8 @@ import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (charAt, fromCharArray, length, slice)
 
-type Tokens =
-  { referenceIncrement :: String
+type Settings r =
+  ( referenceIncrement :: String
   , referenceDecrement :: String
   , pointerIncrement :: String
   , pointerDecrement :: String
@@ -22,10 +22,11 @@ type Tokens =
   , input :: String
   , loopStart :: String
   , loopEnd :: String
-  }
+  | r
+  )
 
-defaultToken :: Tokens
-defaultToken =
+defaultSettings :: Record (Settings ())
+defaultSettings =
   { referenceIncrement: "+"
   , referenceDecrement: "-"
   , pointerIncrement: ">"
@@ -36,7 +37,7 @@ defaultToken =
   , loopEnd: "]"
   }
 
-kurageToken :: Tokens
+kurageToken :: Record (Settings ())
 kurageToken =
   { referenceIncrement: "ଦ"
   , referenceDecrement: "ନ"
@@ -48,12 +49,7 @@ kurageToken =
   , loopEnd: "ଧ"
   }
 
-{-
-ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଥ ନ ଲ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଲ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଲ ଦ ଦ ଦ ଦ ଦ କ କ କ ଧ ଲ ଳ ଲ ଦ ଦ ଳ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଳ ଳ ଦ ଦ ଦ ଳ ଲ ନ ଳ
-ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ନ ଳ କ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଦ ଳ ନ ନ ନ ନ ନ ନ ନ ନ ଳ ଦ ଦ ଦ ଳ ନ ନ ନ ନ ନ ନ ଳ ନ ନ ନ ନ ନ ନ ନ ନ ଳ ଲ ଦ ଳ
--}
-
-parse :: Tokens -> String -> Either ParseError BrainfkAST
+parse :: forall r. Record (Settings r) -> String -> Either ParseError BrainfkAST
 parse tokens str = BrainfkAST <$> runParser
   (pMany pSpace *> pStatement tokens <* pEOF)
   str
@@ -113,7 +109,7 @@ pSome p = do
   xs <- pMany p
   pure $ Array.cons x xs
 
-pStatement :: Tokens -> Parser Statement
+pStatement :: forall r. Record (Settings r) -> Parser Statement
 pStatement tokens = pStatementEnd <|> pStatementCont
   where
   pStatementEnd = StatementEnd <$
@@ -127,7 +123,7 @@ pStatement tokens = pStatementEnd <|> pStatementCont
     statement <- pStatement tokens
     pure $ StatementCont command statement
 
-pCommand :: Tokens -> Parser Command
+pCommand :: forall r. Record (Settings r) -> Parser Command
 pCommand tokens = do
   { position } <- get
   let

@@ -39,18 +39,29 @@ instance Show ExecError where
   show (ExceedsMaxStep max) = "Exceeds max step: " <> show max
   show (ProcessKilled err) = "Process killed: " <> show err
 
-type Settings =
-  { memorySize :: Int
+type Settings r =
+  ( memorySize :: Int
   , cellSize :: Int
   , chunkNum :: Int -- 1回のまとまりで処理する個数
   , isLoopMemory :: Boolean --メモリの左端(あるいは右端)に到達したときにループするかどうか
   , isLoopCell :: Boolean -- メモリのセルがオーバーフローしたときにループするかどうか
+  | r
+  )
+
+defaultSettings :: Record (Settings ())
+defaultSettings =
+  { memorySize: 256
+  , chunkNum: 15000
+  , isLoopMemory: true
+  , isLoopCell: true
+  , cellSize: 256
   }
 
 -- | Execute BrainfkAST
 -- | callback function is called when update output
 exec
-  :: Settings
+  :: forall r
+   . Record (Settings r)
   -> String
   -> BrainfkAST
   -> Effect
