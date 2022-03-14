@@ -2,8 +2,8 @@ module Brainfk.Data.Settings where
 
 import Prelude
 
-import Brainfk.System.Exec as Exec
 import Brainfk.System.Parse as Parse
+import Brainfk.System.Transpile as Transpile
 import Data.Argonaut (decodeJson, encodeJson, parseJson, stringify)
 import Data.Either (hush)
 import Data.Maybe (Maybe)
@@ -13,7 +13,7 @@ import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem)
 
-type Settings = Exec.Settings (Parse.Settings ())
+type Settings = Transpile.Settings (Parse.Settings ())
 
 settingsToString :: Record Settings -> String
 settingsToString = encodeJson >>> stringify
@@ -34,4 +34,4 @@ loadSettings = do
   pure $ stringToSettings =<< res
 
 defaultSettings :: Record Settings
-defaultSettings = disjointUnion Parse.defaultSettings Exec.defaultSettings
+defaultSettings = disjointUnion Parse.defaultSettings Transpile.defaultSettings

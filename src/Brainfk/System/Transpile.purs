@@ -16,6 +16,13 @@ type Settings r =
   | r
   )
 
+defaultSettings :: Record (Settings ())
+defaultSettings =
+  { memorySize: 256
+  , chunkNum: 10000
+  , cellSize: 256
+  }
+
 foreign import exec_
   :: Effect Unit
   -> (Effect Unit -> Effect Unit)
