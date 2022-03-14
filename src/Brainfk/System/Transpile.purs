@@ -68,10 +68,10 @@ transpile settings (BrainfkAST statement) input = tPrelude settings input
 tPrelude :: forall r. Record (Settings r) -> String -> String
 tPrelude { memorySize } input =
   "'use strict';let p=0;let m=[... new Array(" <> show memorySize
-    <> ")].fill(0);let i='"
-    <> input
+    <> ")].fill(0);let i="
+    <> show input
     <>
-      "';let x=0;let o='';let z=false;let c=0;let f=async ()=>{c=0;if(z){throw new Error('Process Killed')};await new Promise((v)=>{setZeroTimeout(v)();});};let w=(async ()=>{"
+      ";let x=0;let o='';let z=false;let c=0;let f=async ()=>{c=0;if(z){throw new Error('Process Killed')};await new Promise((v)=>{setZeroTimeout(v)();});};let w=(async ()=>{"
 
 -- pointerPos に現在のポインターの位置をもちまわす
 -- while 文の最後にずらして補正
