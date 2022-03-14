@@ -10,7 +10,6 @@ import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Number as Num
 import Data.String.CodeUnits (slice)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Milliseconds(..), delay, message)
@@ -43,6 +42,14 @@ component = Hooks.component \_ _ -> Hooks.do
   settings /\ settingsId <- useState defaultSettings
 
   let
+    checkParseError v = case parse settings v of
+      Right _ -> do
+        put parseErrorTextId "OK"
+        put isParseErrorId false
+      Left parseError -> do
+        put parseErrorTextId $ show parseError
+        put isParseErrorId true
+
     autoScroll = do
       outputRef <- getRef $ RefLabel "OutputRef"
 
@@ -253,7 +260,9 @@ component = Hooks.component \_ _ -> Hooks.do
                 if isSettingsModalOpen then
                   ""
                 else "invisible opacity-0"
-        , onClick \_ -> put isSettingsModalOpenId false
+        , onClick \_ -> do
+            put isSettingsModalOpenId false
+            checkParseError codeValue
         ] -- Modal
         [ HH.div
             [ css $
@@ -264,7 +273,9 @@ component = Hooks.component \_ _ -> Hooks.do
             ]
             [ HH.div [ css "right-0 flex flex-row justify-end mb-3" ]
                 [ button
-                    [ onClick \_ -> put isSettingsModalOpenId false
+                    [ onClick \_ -> do
+                        put isSettingsModalOpenId false
+                        checkParseError codeValue
                     , css
                         "text-zinc-500 transition hover:text-zinc-600 disabled:text-zinc-300"
                     ]
