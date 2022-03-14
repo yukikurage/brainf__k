@@ -65,6 +65,17 @@ transpile settings (BrainfkAST statement) input = tPrelude settings input
     0
   <> tReturn
 
+{-
+p: Pointer,
+m: Memory,
+i: Input,
+x: Input Index,
+o: Output,
+c: Chunk,
+z: IsStop,
+f: Async
+w: Wait
+-}
 tPrelude :: forall r. Record (Settings r) -> String -> String
 tPrelude { memorySize } input =
   "'use strict';let p=0;let m=[... new Array(" <> show memorySize
