@@ -2,25 +2,28 @@ module Brainfk.Web.Components.Body where
 
 import Prelude
 
+import Brainfk.Data.Settings (defaultSettings)
 import Brainfk.System.Exec (exec)
-import Brainfk.System.Parse (defaultSettings, parse)
-import Brainfk.Web.Util (css, icon, wrap)
+import Brainfk.System.Parse (parse)
+import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
+import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Number as Num
 import Data.String.CodeUnits (slice)
 import Data.Tuple.Nested ((/\))
-import Effect.Aff (Aff, Milliseconds(..), delay, message)
+import Effect.Aff (Milliseconds(..), delay, message)
 import Effect.Aff.Class (class MonadAff)
 import Halogen (Component, RefLabel(..), liftAff, liftEffect)
 import Halogen.HTML (button, div_, text, textarea)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onValueInput)
-import Halogen.HTML.Properties (disabled, href, readOnly, ref, rel, target, value)
+import Halogen.HTML.Properties (InputType(..), disabled, href, readOnly, ref, rel, target, type_, value)
 import Halogen.Hooks (fork, getRef, kill, modify_, put, useState)
 import Halogen.Hooks as Hooks
 import Web.DOM.Element (scrollHeight, setScrollTop)
-import Web.Event.Event (preventDefault, stopPropagation)
+import Web.Event.Event (stopPropagation)
 import Web.UIEvent.MouseEvent as MouseEvent
 
 component
@@ -37,6 +40,7 @@ component = Hooks.component \_ _ -> Hooks.do
   stepNum /\ stepNumId <- useState 0
   isParseError /\ isParseErrorId <- useState false
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
+  settings /\ settingsId <- useState defaultSettings
 
   let
     autoScroll = do
@@ -54,20 +58,12 @@ component = Hooks.component \_ _ -> Hooks.do
       put parseErrorTextId ""
       put stepNumId 0
       put isRunningId true
-      case parse defaultSettings codeValue of
+      case parse settings codeValue of
         Left parseError -> do
           put parseErrorTextId $ show parseError
         Right ast -> do
           { getOutput, waitFinish, stop, getStep } <- liftEffect
-            $ exec
-                { memorySize: 256
-                , chunkNum: 15000
-                , isLoopMemory: true
-                , isLoopCell: true
-                , cellSize: 256
-                }
-                inputValue
-                ast
+            $ exec settings inputValue ast
 
           updateForkId <- fork $ forever do
             output <- liftEffect getOutput
@@ -108,6 +104,14 @@ component = Hooks.component \_ _ -> Hooks.do
           put stopEffectId $ do
             liftEffect stop
             kill updateForkId
+
+  let
+    settingsItem label child = HH.div [ css "w-auto flex flex-row" ]
+      [ HH.div [ css "w-44" ]
+          [ HH.text label
+          ]
+      , HH.div [ css "w-auto h-auto" ] child
+      ]
 
   Hooks.pure $ HH.div
     [ css
@@ -166,7 +170,7 @@ component = Hooks.component \_ _ -> Hooks.do
                     [ value codeValue
                     , onValueInput \value -> do
                         put codeValueId value
-                        case parse defaultSettings value of
+                        case parse settings value of
                           Right _ -> do
                             put parseErrorTextId "OK"
                             put isParseErrorId false
@@ -253,7 +257,7 @@ component = Hooks.component \_ _ -> Hooks.do
         ] -- Modal
         [ HH.div
             [ css $
-                "h-fit w-fit p-4 rounded-sm bg-white transition-all duration-75 "
+                "h-fit w-fit p-6 rounded-sm bg-white transition-all duration-75 "
                   <>
                     if isSettingsModalOpen then "" else "scale-[0.96]"
             , onClick \e -> liftEffect $ stopPropagation $ MouseEvent.toEvent e
@@ -266,11 +270,102 @@ component = Hooks.component \_ _ -> Hooks.do
                     ]
                     [ icon "fa-solid fa-xmark fa-2xl" ]
                 ]
-            , HH.div [ css "flex flex-row w-full gap-4" ]
-                [ HH.div [ css "flex flex-col h-full flex-grow gap-2" ]
-                    [ HH.div [ css "text-lg" ] [ text "Parse Settings" ] ]
-                , HH.div [ css "flex flex-col h-full flex-grow gap-2" ]
-                    [ HH.div [ css "text-lg" ] [ text "Exec Settings" ] ]
+            , HH.div [ css "flex flex-row w-full gap-6" ]
+                [ HH.div [ css "flex flex-col h-full flex-grow gap-3 text-lg" ]
+                    [ HH.div [ css "text-xl" ] [ text "Parse Settings" ]
+                    , settingsItem "Pointer Increment"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.pointerIncrement
+                            , onValueInput \value -> putRecord settingsId
+                                { pointerIncrement: value }
+                            ]
+                        ]
+                    , settingsItem "Pointer Decrement"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.pointerDecrement
+                            , onValueInput \value -> putRecord settingsId
+                                { pointerDecrement: value }
+                            ]
+                        ]
+                    , settingsItem "Value Increment"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.referenceIncrement
+                            , onValueInput \value -> putRecord settingsId
+                                { referenceIncrement: value }
+                            ]
+                        ]
+                    , settingsItem "Value Decrement"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.referenceDecrement
+                            , onValueInput \value -> putRecord settingsId
+                                { referenceDecrement: value }
+                            ]
+                        ]
+                    , settingsItem "Output"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.output
+                            , onValueInput \value -> putRecord settingsId
+                                { output: value }
+                            ]
+                        ]
+                    , settingsItem "Input"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.input
+                            , onValueInput \value -> putRecord settingsId
+                                { input: value }
+                            ]
+                        ]
+                    , settingsItem "Loop Start"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.loopStart
+                            , onValueInput \value -> putRecord settingsId
+                                { loopStart: value }
+                            ]
+                        ]
+                    , settingsItem "Loop End"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , value $ settings.loopEnd
+                            , onValueInput \value -> putRecord settingsId
+                                { loopEnd: value }
+                            ]
+                        ]
+                    ]
+                , HH.div [ css "flex flex-col h-full flex-grow gap-3 text-lg" ]
+                    [ HH.div [ css "text-xl" ] [ text "Exec Settings" ]
+                    , settingsItem "Memory Size"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , type_ $ InputNumber
+                            , value $ show $ settings.memorySize
+                            , onValueInput \value -> modifyRecord settingsId
+                                \{ memorySize } ->
+                                  { memorySize: fromMaybe memorySize $
+                                      Int.fromString value
+                                  }
+                            ]
+                        ]
+                    , settingsItem "Cell Size"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , type_ $ InputNumber
+                            , value $ show $ settings.cellSize
+                            , onValueInput \value -> modifyRecord settingsId
+                                \{ cellSize } ->
+                                  { cellSize: fromMaybe cellSize $
+                                      Int.fromString value
+                                  }
+
+                            ]
+                        ]
+                    ]
                 ]
 
             ]

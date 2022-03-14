@@ -17,7 +17,6 @@ to generate this file without the comments in this block.
   , "arrays"
   , "console"
   , "control"
-  , "datetime"
   , "debug"
   , "dom-indexed"
   , "effect"
@@ -28,7 +27,6 @@ to generate this file without the comments in this block.
   , "halogen-hooks"
   , "lists"
   , "maybe"
-  , "now"
   , "prelude"
   , "record"
   , "refs"
@@ -38,8 +36,10 @@ to generate this file without the comments in this block.
   , "transformers"
   , "tuples"
   , "web-dom"
+  , "web-events"
   , "web-html"
   , "web-storage"
+  , "web-uievents"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

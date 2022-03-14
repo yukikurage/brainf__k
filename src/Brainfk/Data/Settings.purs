@@ -8,6 +8,7 @@ import Data.Argonaut (decodeJson, encodeJson, parseJson, stringify)
 import Data.Either (hush)
 import Data.Maybe (Maybe)
 import Effect (Effect)
+import Record (disjointUnion)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem)
@@ -31,3 +32,6 @@ loadSettings :: Effect (Maybe (Record Settings))
 loadSettings = do
   res <- getItem "save_settings" =<< localStorage =<< window
   pure $ stringToSettings =<< res
+
+defaultSettings :: Record Settings
+defaultSettings = disjointUnion Parse.defaultSettings Exec.defaultSettings

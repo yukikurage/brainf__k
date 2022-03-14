@@ -1,15 +1,12 @@
 module Brainfk.Web.Store where
 
-import Brainfk.Data.Settings (Settings)
-import Brainfk.System.Exec as Exec
-import Brainfk.System.Parse as Parse
-import Record (disjointUnion)
+import Brainfk.Data.Settings (Settings, defaultSettings)
 
 type Store = { settings :: Record Settings }
 
 initialStore :: Store
 initialStore =
-  { settings: disjointUnion Parse.defaultSettings Exec.defaultSettings
+  { settings: defaultSettings
   }
 
 data Action = PutSettings (Record Settings)
