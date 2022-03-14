@@ -86,7 +86,7 @@ component = Hooks.component \_ _ -> Hooks.do
             liftAff $ delay $ Milliseconds $ 50.0
 
           _ <- fork do
-            liftAff waitFinish
+            runtimeErrorMaybe <- liftAff waitFinish
             kill updateForkId
             output <- liftEffect getOutput
             modify_ outputTextId
@@ -97,6 +97,11 @@ component = Hooks.component \_ _ -> Hooks.do
             put stepNumId step
             autoScroll
             put isRunningId false
+            case runtimeErrorMaybe of
+              Just runtimeError -> do
+                modify_ outputTextId
+                  (\prev -> prev <> "\nError: " <> message runtimeError)
+              Nothing -> pure unit
 
           put stopEffectId $ do
             liftEffect stop
@@ -220,7 +225,7 @@ component = Hooks.component \_ _ -> Hooks.do
                     [ textarea
                         [ value $ outputText
                         , readOnly true
-                        , wrap "soft"
+                        , wrap "off"
                         , css
                             """
                       w-full
