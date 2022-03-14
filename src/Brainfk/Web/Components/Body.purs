@@ -3,8 +3,8 @@ module Brainfk.Web.Components.Body where
 import Prelude
 
 import Brainfk.Data.Settings (defaultSettings)
-import Brainfk.System.Exec (exec)
 import Brainfk.System.Parse (parse)
+import Brainfk.System.Transpile (exec)
 import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
@@ -69,8 +69,8 @@ component = Hooks.component \_ _ -> Hooks.do
         Left parseError -> do
           put parseErrorTextId $ show parseError
         Right ast -> do
-          { getOutput, waitFinish, stop, getStep } <- liftEffect
-            $ exec settings inputValue ast
+          { getOutput, stop, getStep, waitFinish } <- liftEffect
+            $ exec settings ast inputValue
 
           updateForkId <- fork $ forever do
             output <- liftEffect getOutput
@@ -86,10 +86,8 @@ component = Hooks.component \_ _ -> Hooks.do
             liftAff $ delay $ Milliseconds $ 50.0
 
           _ <- fork do
-            runtimeErrorMaybe <- liftAff waitFinish
-
+            liftAff waitFinish
             kill updateForkId
-
             output <- liftEffect getOutput
             modify_ outputTextId
               ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
@@ -97,16 +95,8 @@ component = Hooks.component \_ _ -> Hooks.do
               )
             step <- liftEffect getStep
             put stepNumId step
-
             autoScroll
-
             put isRunningId false
-
-            case runtimeErrorMaybe of
-              Just runtimeError -> do
-                modify_ outputTextId
-                  (\prev -> prev <> "\nError: " <> message runtimeError)
-              Nothing -> pure unit
 
           put stopEffectId $ do
             liftEffect stop
