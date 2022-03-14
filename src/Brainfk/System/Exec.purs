@@ -51,7 +51,7 @@ type Settings r =
 defaultSettings :: Record (Settings ())
 defaultSettings =
   { memorySize: 256
-  , chunkNum: 15000
+  , chunkNum: 5000
   , isLoopMemory: true
   , isLoopCell: true
   , cellSize: 256
