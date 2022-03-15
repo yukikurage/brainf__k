@@ -15,7 +15,7 @@ import Data.Tuple.Nested ((/\))
 import Effect.Aff (Milliseconds(..), delay, message)
 import Effect.Aff.Class (class MonadAff)
 import Halogen (Component, RefLabel(..), liftAff, liftEffect)
-import Halogen.HTML (button, div_, text, textarea)
+import Halogen.HTML (button, text, textarea)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onValueInput)
 import Halogen.HTML.Properties (InputType(..), checked, disabled, href, name, readOnly, ref, rel, target, type_, value)
@@ -33,21 +33,16 @@ component = Hooks.component \_ _ -> Hooks.do
   codeValue /\ codeValueId <- useState ""
   inputValue /\ inputValueId <- useState ""
   outputText /\ outputTextId <- useState ""
-  parseErrorText /\ parseErrorTextId <- useState ""
   stopEffect /\ stopEffectId <- useState $ pure unit
   isRunning /\ isRunningId <- useState false
-  isParseError /\ isParseErrorId <- useState false
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
   settings /\ settingsId <- useState defaultSettings
 
   let
     checkParseError v = case parse settings v of
-      Right _ -> do
-        put parseErrorTextId "OK"
-        put isParseErrorId false
+      Right _ -> pure unit
       Left parseError -> do
-        put parseErrorTextId $ show parseError
-        put isParseErrorId true
+        put outputTextId $ show parseError
 
     autoScroll = do
       outputRef <- getRef $ RefLabel "OutputRef"
@@ -61,11 +56,11 @@ component = Hooks.component \_ _ -> Hooks.do
     runBrainfk = do
       stopEffect
       put outputTextId ""
-      put parseErrorTextId ""
       put isRunningId true
       case parse settings codeValue of
         Left parseError -> do
-          put parseErrorTextId $ show parseError
+          put outputTextId $ show parseError
+          put isRunningId false
         Right ast -> do
           { getOutput, stop, waitFinish } <- liftEffect
             $ exec settings ast inputValue
@@ -141,7 +136,7 @@ component = Hooks.component \_ _ -> Hooks.do
                 [ onClick \_ -> runBrainfk
                 , css
                     "px-4 text-fuchsia-500 transition hover:text-fuchsia-600 disabled:text-fuchsia-300"
-                , disabled (isRunning || isParseError)
+                , disabled (isRunning)
                 ]
                 [ icon "fa-solid fa-play fa-xl" ]
             , button
@@ -166,13 +161,6 @@ component = Hooks.component \_ _ -> Hooks.do
                     [ value codeValue
                     , onValueInput \value -> do
                         put codeValueId value
-                        case parse settings value of
-                          Right _ -> do
-                            put parseErrorTextId "OK"
-                            put isParseErrorId false
-                          Left parseError -> do
-                            put parseErrorTextId $ show parseError
-                            put isParseErrorId true
                     , wrap "off"
                     , css
                         """w-full
@@ -188,7 +176,6 @@ component = Hooks.component \_ _ -> Hooks.do
                       border-none
                       outline-zinc-300"""
                     ]
-                , div_ [ text "parse error: ", text parseErrorText ]
                 ]
             , HH.div [ css "h-full flex-[6] flex flex-col" ]
                 [ HH.div [ css "text-xl p-1" ] [ text "Input" ]

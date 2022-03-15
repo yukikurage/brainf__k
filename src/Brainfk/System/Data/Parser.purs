@@ -4,9 +4,9 @@ import Prelude
 
 import Control.Alt (class Alt)
 import Control.Monad.Error.Class (class MonadError, class MonadThrow)
-import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Except (Except, runExcept)
 import Control.Monad.Rec.Class (class MonadRec)
-import Control.Monad.State (class MonadState, State, evalState)
+import Control.Monad.State (class MonadState, StateT, evalStateT)
 import Data.Array (intercalate)
 import Data.Either (Either)
 import Data.Tuple.Nested ((/\))
@@ -44,7 +44,7 @@ type ParserState =
   , position :: Int
   }
 
-newtype Parser a = Parser (ExceptT ParseError (State ParserState) a)
+newtype Parser a = Parser (StateT ParserState (Except ParseError) a)
 
 derive newtype instance Functor Parser
 derive newtype instance Apply Parser
@@ -58,7 +58,7 @@ derive newtype instance MonadRec Parser
 derive newtype instance MonadError ParseError Parser
 
 runParser :: forall a. Parser a -> String -> Either ParseError a
-runParser (Parser p) input = evalState (runExceptT p) $
+runParser (Parser p) input = runExcept $ evalStateT p
   { input
   , position: 0
   }

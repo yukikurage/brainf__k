@@ -18,15 +18,14 @@ instance Show Command where
   show (ReferenceIncrement _ i) = fold $ replicate i "+"
   show (Output _) = "."
   show (Input _) = ","
-  show (Loop _ s) = "[" <> show s <> "]"
+  show (Loop _ s) = "Statement " <> show s <> ""
 
-data Statement = StatementCont Command Statement | StatementEnd
+data Statement = Statement (Array Command)
 
 derive instance Eq Statement
 derive instance Ord Statement
 instance Show Statement where
-  show (StatementCont c s) = show c <> "" <> show s
-  show StatementEnd = ""
+  show (Statement cs) = show cs
 
 newtype BrainfkAST = BrainfkAST Statement
 

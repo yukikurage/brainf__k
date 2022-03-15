@@ -2,7 +2,7 @@ module Brainfk.Util where
 
 import Prelude
 
-import Data.Array (fromFoldable, reverse)
+import Data.Array (fromFoldable)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
@@ -10,7 +10,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, makeAff)
 
 whileM :: forall m a. Monad m => m (Maybe a) -> m (Array a)
-whileM action = reverse <<< fromFoldable <$> loop
+whileM action = fromFoldable <$> loop
   where
   loop = do
     res <- action

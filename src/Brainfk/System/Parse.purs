@@ -110,18 +110,7 @@ pSome p = do
   pure $ Array.cons x xs
 
 pStatement :: forall r. Record (Settings r) -> Parser Statement
-pStatement tokens = pStatementEnd <|> pStatementCont
-  where
-  pStatementEnd = StatementEnd <$
-    ( pEOF <|>
-        ( unit <$
-            (lookForeword $ lexeme $ pToken $ tokens.loopEnd)
-        )
-    )
-  pStatementCont = do
-    command <- pCommand tokens
-    statement <- pStatement tokens
-    pure $ StatementCont command statement
+pStatement tokens = Statement <$> pMany (pCommand tokens)
 
 pCommand :: forall r. Record (Settings r) -> Parser Command
 pCommand tokens = do
@@ -137,9 +126,10 @@ pCommand tokens = do
     pCommandPointerIncrement = PointerIncrement position <<< Array.length <$>
       pSome
         (lexeme $ pToken tokens.pointerIncrement)
-    pCommandPointerDecrement = PointerIncrement position <<< negate <<< Array.length <$>
-      pSome
-        (lexeme $ pToken tokens.pointerDecrement)
+    pCommandPointerDecrement =
+      PointerIncrement position <<< negate <<< Array.length <$>
+        pSome
+          (lexeme $ pToken tokens.pointerDecrement)
     pCommandOutput = Output position <$ (lexeme $ pToken tokens.output)
     pCommandInput = Input position <$ (lexeme $ pToken tokens.input)
     pCommandLoop = try do
