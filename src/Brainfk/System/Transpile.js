@@ -5,6 +5,8 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
     ${func}
   }, false);`;
 
+  console.log(workerContent);
+
   const workerUrl = URL.createObjectURL(
     new Blob([workerContent])
   );
@@ -16,8 +18,8 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
   worker.addEventListener(
     "message",
     (e) => {
-      if (e.data.type === "output") {
-        output += e.data.value;
+      if (e.data !== "fi") {
+        output += e.data;
       }
     },
     false
@@ -36,7 +38,7 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       worker.addEventListener(
         "message",
         (e) => {
-          if (e.data.type === "finish") {
+          if (e.data === "fi") {
             worker.terminate();
             URL.revokeObjectURL(workerUrl);
             resolve(nothing);

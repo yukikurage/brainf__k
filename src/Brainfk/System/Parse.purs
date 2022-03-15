@@ -130,13 +130,14 @@ pCommand tokens = do
     pCommandReferenceIncrement = ReferenceIncrement position <<< Array.length
       <$> pSome
         (lexeme $ pToken tokens.referenceIncrement)
-    pCommandReferenceDecrement = ReferenceDecrement position <<< Array.length
-      <$> pSome
-        (lexeme $ pToken tokens.referenceDecrement)
+    pCommandReferenceDecrement =
+      ReferenceIncrement position <<< negate <<< Array.length
+        <$> pSome
+          (lexeme $ pToken tokens.referenceDecrement)
     pCommandPointerIncrement = PointerIncrement position <<< Array.length <$>
       pSome
         (lexeme $ pToken tokens.pointerIncrement)
-    pCommandPointerDecrement = PointerDecrement position <<< Array.length <$>
+    pCommandPointerDecrement = PointerIncrement position <<< negate <<< Array.length <$>
       pSome
         (lexeme $ pToken tokens.pointerDecrement)
     pCommandOutput = Output position <$ (lexeme $ pToken tokens.output)

@@ -190,7 +190,7 @@ component = Hooks.component \_ _ -> Hooks.do
                     ]
                 , div_ [ text "parse error: ", text parseErrorText ]
                 ]
-            , HH.div [ css "h-full flex-[5] flex flex-col" ]
+            , HH.div [ css "h-full flex-[6] flex flex-col" ]
                 [ HH.div [ css "text-xl p-1" ] [ text "Input" ]
                 , HH.div [ css "w-full flex-[2] p-1" ]
                     [ textarea
@@ -351,7 +351,7 @@ component = Hooks.component \_ _ -> Hooks.do
                                   }
                             ]
                         ]
-                    , settingsItem "Cell Size"
+                    , settingsItem "Cell Size(<= 65536)"
                         [ HH.input
                             [ css "w-40 font-roboto"
                             , type_ $ InputNumber
@@ -359,19 +359,6 @@ component = Hooks.component \_ _ -> Hooks.do
                             , onValueInput \value -> modifyRecord settingsId
                                 \{ cellSize } ->
                                   { cellSize: fromMaybe cellSize $
-                                      Int.fromString value
-                                  }
-
-                            ]
-                        ]
-                    , settingsItem "Output Threshold"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , type_ $ InputNumber
-                            , value $ show $ settings.chunkNum
-                            , onValueInput \value -> modifyRecord settingsId
-                                \{ chunkNum } ->
-                                  { chunkNum: fromMaybe chunkNum $
                                       Int.fromString value
                                   }
 
