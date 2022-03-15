@@ -20,7 +20,7 @@ self.addEventListener('message',() => {
     "message",
     (e) => {
       if (e.data !== "fi") {
-        output += e.data;
+        output += String.fromCodePoint(e.data);
       }
     },
     false

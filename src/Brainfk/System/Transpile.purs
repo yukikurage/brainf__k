@@ -156,9 +156,9 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
             <> mkMemoryAcc
             <> "=i.codePointAt(x);x++;"
             <> tStatement settings statement pointerPos
-        Output _ -> "postMessage(String.fromCodePoint("
+        Output _ -> "postMessage("
           <> mkMemoryAcc
-          <> "));"
+          <> ");"
           <> tStatement settings statement pointerPos
         Loop _ loopStatement ->
           ( if pointerPos == 0 then ""
