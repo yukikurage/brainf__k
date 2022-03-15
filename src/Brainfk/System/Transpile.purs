@@ -8,9 +8,13 @@ import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff, Error)
 
+data CellSize = Bit8 | Bit16 | Bit32
+
+derive instance Eq CellSize
+
 type Settings r =
   ( memorySize :: Int
-  , cellSize :: Int
+  , cellSize :: CellSize
   , chunkNum :: Int -- 1回のまとまりで処理する個数
   | r
   )
@@ -19,7 +23,7 @@ defaultSettings :: Record (Settings ())
 defaultSettings =
   { memorySize: 512
   , chunkNum: 20
-  , cellSize: 256
+  , cellSize: Bit8
   }
 
 foreign import exec_
@@ -70,41 +74,41 @@ f: Async
 w: Wait
 -}
 tPrelude :: forall r. Record (Settings r) -> String -> String
-tPrelude { memorySize } input =
-  "let p=0;let m=new Uint16Array(" <> show memorySize
-    <> ");let i="
+tPrelude { memorySize, cellSize } input =
+  "let p=0;let m=new Uint" <> bit <> "Array(" <> show memorySize
+    <> ").fill(0);let i="
     <> show input
     <>
       ";let x=0;let c=0;"
+  where
+  bit = case cellSize of
+    Bit8 -> "8"
+    Bit16 -> "16"
+    Bit32 -> "32"
 
 -- pointerPos に現在のポインターの位置をもちまわす
 -- while 文の最後にずらして補正
 tStatement
   :: forall r. Record (Settings r) -> Statement -> Int -> String
-tStatement { memorySize } (StatementEnd) pointerPos =
+tStatement _ (StatementEnd) pointerPos =
   if pointerPos == 0 then ""
-  else "p=(p+" <> show pointerPos
-    <> ")%"
-    <> show memorySize
+  else "p+=" <> show pointerPos
     <> ";"
 tStatement
-  settings@{ memorySize, cellSize }
+  settings
   (StatementCont command statement)
   pointerPos =
   let
+    showNeg n = if n < 0 then show n else "+" <> show n
     mkMemoryAcc =
       if pointerPos == 0 then "m[p]"
-      else "m[(p+"
-        <> show pointerPos
-        <> ")%"
-        <> show memorySize
+      else "m[p"
+        <> showNeg pointerPos
         <> "]"
     mkMemoryAcc' n =
       if n == 0 then "m[p]"
-      else "m[(p+"
-        <> show n
-        <> ")%"
-        <> show memorySize
+      else "m[p"
+        <> showNeg n
         <> "]"
   in
     case command of
@@ -168,15 +172,11 @@ tStatement
         <> mkMemoryAcc' (pointerPos + n)
         <> "=0"
         <> tStatement settings statement pointerPos
-      PointerIncrement _ n -> tStatement settings statement
-        ((pointerPos + n) `mod` memorySize)
-      ReferenceIncrement _ n -> mkMemoryAcc <> "=(" <> mkMemoryAcc <> "+"
-        <> show ((cellSize + n) `mod` cellSize)
-        <> ")%"
-        <> show cellSize
+      PointerIncrement _ n -> tStatement settings statement $ pointerPos + n
+      ReferenceIncrement _ n -> mkMemoryAcc <> "+="
+        <> show n
         <> ";"
-        <>
-          tStatement settings statement pointerPos
+        <> tStatement settings statement pointerPos
       Input _ ->
         "if(x>=i.length){throw new Error('Exceeds Input Range');};"
           <> mkMemoryAcc
@@ -188,9 +188,7 @@ tStatement
         <> tStatement settings statement pointerPos
       Loop _ loopStatement ->
         ( if pointerPos == 0 then ""
-          else "p=(p+" <> show pointerPos <> ")%"
-            <> show memorySize
-            <> ";"
+          else "p+=" <> show pointerPos <> ";"
         )
           <>
             "while(m[p]){"

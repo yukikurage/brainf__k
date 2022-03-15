@@ -4,7 +4,7 @@ import Prelude
 
 import Brainfk.Data.Settings (defaultSettings)
 import Brainfk.System.Parse (parse)
-import Brainfk.System.Transpile (exec)
+import Brainfk.System.Transpile (CellSize(..), exec)
 import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
@@ -18,7 +18,7 @@ import Halogen (Component, RefLabel(..), liftAff, liftEffect)
 import Halogen.HTML (button, div_, text, textarea)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onValueInput)
-import Halogen.HTML.Properties (InputType(..), disabled, href, readOnly, ref, rel, target, type_, value)
+import Halogen.HTML.Properties (InputType(..), checked, disabled, href, name, readOnly, ref, rel, target, type_, value)
 import Halogen.Hooks (fork, getRef, kill, modify_, put, useState)
 import Halogen.Hooks as Hooks
 import Web.DOM.Element (scrollHeight, setScrollTop)
@@ -351,19 +351,46 @@ component = Hooks.component \_ _ -> Hooks.do
                                   }
                             ]
                         ]
-                    , settingsItem "Cell Size(<= 65536)"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , type_ $ InputNumber
-                            , value $ show $ settings.cellSize
-                            , onValueInput \value -> modifyRecord settingsId
-                                \{ cellSize } ->
-                                  { cellSize: fromMaybe cellSize $
-                                      Int.fromString value
-                                  }
-
+                    , settingsItem "Cell Size"
+                        [ HH.div
+                            [ css "flex flex-col gap-3" ]
+                            [ HH.div [ css "flex flex-row gap-2 items-center" ]
+                                [ HH.input
+                                    [ type_ $ InputRadio
+                                    , checked $ settings.cellSize == Bit8
+                                    , onValueInput \_ -> putRecord
+                                        settingsId
+                                        { cellSize: Bit8 }
+                                    , name "CellSize"
+                                    ]
+                                , HH.text "8 bit"
+                                ]
+                            , HH.div [ css "flex flex-row gap-2 items-center" ]
+                                [ HH.input
+                                    [ type_ $ InputRadio
+                                    , checked $ settings.cellSize == Bit16
+                                    , onValueInput \_ -> putRecord
+                                        settingsId
+                                        { cellSize: Bit16 }
+                                    , name "CellSize"
+                                    ]
+                                , HH.text "16 bit"
+                                ]
+                            , HH.div
+                                [ css "flex flex-row gap-2 items-center" ]
+                                [ HH.input
+                                    [ type_ $ InputRadio
+                                    , checked $ settings.cellSize == Bit32
+                                    , onValueInput \_ -> putRecord
+                                        settingsId
+                                        { cellSize: Bit32 }
+                                    , name "CellSize"
+                                    ]
+                                , HH.text "32 bit"
+                                ]
                             ]
                         ]
+
                     ]
                 ]
 
