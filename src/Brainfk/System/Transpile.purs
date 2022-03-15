@@ -21,7 +21,7 @@ type Settings r =
 
 defaultSettings :: Record (Settings ())
 defaultSettings =
-  { memorySize: 512
+  { memorySize: 2048
   , chunkNum: 20
   , cellSize: Bit8
   }
