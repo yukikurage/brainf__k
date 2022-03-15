@@ -49,7 +49,7 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       worker.addEventListener(
         "error",
         (e) => {
-          resolve(just(e.message));
+          resolve(just(e));
           worker.terminate();
           URL.revokeObjectURL(workerUrl);
         },
