@@ -5,8 +5,6 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
     ${func}
   }, false);`;
 
-  console.log(workerContent)
-
   const workerUrl = URL.createObjectURL(
     new Blob([workerContent])
   );

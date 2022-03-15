@@ -119,10 +119,11 @@ tStatement
         <> ";"
         <>
           tStatement settings statement pointerPos
-      Input _ -> "if(x>=i.length){throw new Error('Exceeds Input Range')};"
-        <> mkMemoryAcc
-        <> "=i.codePointAt(x);x++;"
-        <> tStatement settings statement pointerPos
+      Input _ ->
+        "if(x>=i.length){postMessage({type:'output',value:o});throw new Error('Exceeds Input Range');};"
+          <> mkMemoryAcc
+          <> "=i.codePointAt(x);x++;"
+          <> tStatement settings statement pointerPos
 
       Output _ -> "o+=String.fromCodePoint("
         <> mkMemoryAcc
