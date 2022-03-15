@@ -6,9 +6,9 @@ import Brainfk.System.Data.BrainfkAST (BrainfkAST(..), Command(..), Statement(..
 import Control.Promise (Promise, toAff)
 import Data.Array (uncons)
 import Data.Maybe (Maybe(..))
+import Data.Ord (abs)
 import Effect (Effect)
 import Effect.Aff (Aff, Error)
-import Effect.Class.Console (logShow)
 
 data CellSize = Bit8 | Bit16 | Bit32
 
@@ -54,7 +54,6 @@ exec settings brainfkAST input = do
     transpiled = transpile settings brainfkAST input
   res@{ waitFinish } <- exec_ Just Nothing
     transpiled
-  logShow brainfkAST
   pure res { waitFinish = toAff waitFinish }
 
 transpile :: forall r. Record (Settings r) -> BrainfkAST -> String -> String
@@ -82,7 +81,7 @@ tPrelude { memorySize, cellSize } input =
     <> ").fill(0);let i="
     <> show input
     <>
-      ";let x=0;let c=0;"
+      ";let x=0;"
   where
   bit = case cellSize of
     Bit8 -> "8"
@@ -96,8 +95,9 @@ tStatement
 tStatement settings (Statement commands) pointerPos = case uncons commands of
   Nothing ->
     if pointerPos == 0 then ""
-    else "p+=" <> show pointerPos
+    else if pointerPos > 0 then "p+=" <> show pointerPos
       <> ";"
+    else "p-=" <> show (abs pointerPos)
   Just { head: command, tail } ->
     let
       statement = Statement tail
