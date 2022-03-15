@@ -101,7 +101,8 @@ tStatement
         <> "]"
   in
     case command of
-      PointerIncrement _ n -> tStatement settings statement (pointerPos + n)
+      PointerIncrement _ n -> tStatement settings statement
+        ((pointerPos + n) `mod` memorySize)
       PointerDecrement _ n -> tStatement settings statement
         ((pointerPos - n) `mod` memorySize)
       ReferenceIncrement _ n -> mkMemoryAcc <> "=(" <> mkMemoryAcc <> "+"
