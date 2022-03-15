@@ -364,6 +364,19 @@ component = Hooks.component \_ _ -> Hooks.do
 
                             ]
                         ]
+                    , settingsItem "Output Threshold"
+                        [ HH.input
+                            [ css "w-40 font-roboto"
+                            , type_ $ InputNumber
+                            , value $ show $ settings.chunkNum
+                            , onValueInput \value -> modifyRecord settingsId
+                                \{ chunkNum } ->
+                                  { chunkNum: fromMaybe chunkNum $
+                                      Int.fromString value
+                                  }
+
+                            ]
+                        ]
                     ]
                 ]
 
