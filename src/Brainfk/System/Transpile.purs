@@ -3,12 +3,10 @@ module Brainfk.System.Transpile where
 import Prelude
 
 import Brainfk.System.Data.BrainfkAST (BrainfkAST(..), Command(..), Statement(..))
-import Brainfk.Util (setZeroTimeout)
 import Control.Promise (Promise, toAff)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff, Error)
-import Effect.Class.Console (log)
 
 type Settings r =
   ( memorySize :: Int
@@ -20,7 +18,7 @@ type Settings r =
 defaultSettings :: Record (Settings ())
 defaultSettings =
   { memorySize: 512
-  , chunkNum: 300000
+  , chunkNum: 10000000
   , cellSize: 256
   }
 
@@ -28,12 +26,10 @@ foreign import exec_
   :: forall a
    . (a -> Maybe a)
   -> Maybe a
-  -> (Effect Unit -> Effect Unit)
   -> String
   -> Effect
        { getOutput :: Effect String
        , stop :: Effect Unit
-       , getMemory :: Effect (Array Int)
        , waitFinish :: Promise (Maybe Error)
        }
 
@@ -43,17 +39,14 @@ exec
   -> BrainfkAST
   -> String
   -> Effect
-       { getMemory :: Effect (Array Int)
-       , getOutput :: Effect String
+       { getOutput :: Effect String
        , stop :: Effect Unit
        , waitFinish :: Aff (Maybe Error)
        }
 exec settings brainfkAST input = do
   let
     transpiled = transpile settings brainfkAST input
-  log transpiled
   res@{ waitFinish } <- exec_ Just Nothing
-    setZeroTimeout
     transpiled
   pure res { waitFinish = toAff waitFinish }
 
@@ -78,11 +71,11 @@ w: Wait
 -}
 tPrelude :: forall r. Record (Settings r) -> String -> String
 tPrelude { memorySize } input =
-  "'use strict';let p=0;let m=[... new Array(" <> show memorySize
+  "let p=0;let m=[... new Array(" <> show memorySize
     <> ")].fill(0);let i="
     <> show input
     <>
-      ";let x=0;let o='';let z=false;let c=0;let f=async ()=>{c=0;if(z){throw new Error('Process Killed')};await new Promise((v)=>{setZeroTimeout(v)();});};let w=(async ()=>{"
+      ";let x=0;let o='';let c=0;"
 
 -- pointerPos に現在のポインターの位置をもちまわす
 -- while 文の最後にずらして補正
@@ -143,11 +136,11 @@ tStatement
           <>
             "while(m[p]){c++;if(c>="
           <> show chunkNum
-          <> "){await f();};"
+          <> "){c=0;postMessage({type:'output',value:o});o=''};"
           <> tStatement settings loopStatement 0
           <> "};"
           <> tStatement settings statement 0
 
 tReturn :: String
 tReturn =
-  "})();return {getMemory:()=>[...m],getOutput:()=>{let r=o;o='';return r;},stop:()=>{z=true;},waitFinish: w}"
+  "postMessage({type:'output',value:o});postMessage({type:'finish'})"

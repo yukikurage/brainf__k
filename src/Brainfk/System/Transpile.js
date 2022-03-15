@@ -1,7 +1,72 @@
 "use strict";
 
-exports.exec_ = (just) => (nothing)  => (setZeroTimeout) => (func) => () => {
-  const res = Function("setZeroTimeout", func)(setZeroTimeout);
-  res.waitFinish = res.waitFinish.then(() => nothing).catch((e) => just(e));
+exports.exec_ = (just) => (nothing) => (func) => () => {
+  const workerContent = `self.addEventListener('message',() => {
+    ${func}
+  }, false);`;
+
+  console.log(workerContent)
+
+  const workerUrl = URL.createObjectURL(
+    new Blob([workerContent])
+  );
+
+  const worker = new Worker(workerUrl);
+
+  let output = "";
+
+  worker.addEventListener(
+    "message",
+    (e) => {
+      if (e.data.type === "output") {
+        output += e.data.value;
+      }
+    },
+    false
+  );
+
+  let terminateCallbackFunc = () => {}
+  const terminateCallback = () => terminateCallbackFunc();
+
+  const res = {
+    getOutput: () => {
+      const res = output;
+      output = "";
+      return res;
+    },
+    waitFinish: new Promise((resolve) => {
+      worker.addEventListener(
+        "message",
+        (e) => {
+          if (e.data.type === "finish") {
+            worker.terminate();
+            URL.revokeObjectURL(workerUrl);
+            resolve(nothing);
+          }
+        },
+        false
+      );
+      worker.addEventListener(
+        "error",
+        (e) => {
+          resolve(just(e.message));
+          worker.terminate();
+          URL.revokeObjectURL(workerUrl);
+        },
+        false
+      );
+      terminateCallbackFunc = () => {
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+        resolve(just(new Error('Process terminated')));
+      }
+    }),
+    stop: () => {
+      terminateCallback();
+    },
+  }
+
+
+  worker.postMessage('');
   return res;
-}
+};
