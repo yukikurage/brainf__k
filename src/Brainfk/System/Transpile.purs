@@ -18,7 +18,7 @@ type Settings r =
 defaultSettings :: Record (Settings ())
 defaultSettings =
   { memorySize: 512
-  , chunkNum: 10000000
+  , chunkNum: 100
   , cellSize: 256
   }
 
@@ -108,14 +108,14 @@ tStatement
         <> show n
         <> ")%"
         <> show cellSize
-        <> ";c++;"
+        <> ";"
         <>
           tStatement settings statement pointerPos
       ReferenceDecrement _ n -> mkMemoryAcc <> "=(" <> mkMemoryAcc <> "+"
         <> show ((-n) `mod` cellSize)
         <> ")%"
         <> show cellSize
-        <> ";c++;"
+        <> ";"
         <>
           tStatement settings statement pointerPos
       Input _ -> "if(x>=i.length){throw new Error('Exceeds Input Range')};"
@@ -126,6 +126,9 @@ tStatement
       Output _ -> "o+=String.fromCodePoint("
         <> mkMemoryAcc
         <> ");"
+        <> "if(o.length>="
+        <> show chunkNum
+        <> "){postMessage({type:'output',value:o});o=''};"
         <> tStatement settings statement pointerPos
       Loop _ loopStatement ->
         ( if pointerPos == 0 then ""
@@ -134,9 +137,7 @@ tStatement
             <> ";"
         )
           <>
-            "while(m[p]){c++;if(c>="
-          <> show chunkNum
-          <> "){c=0;postMessage({type:'output',value:o});o=''};"
+            "while(m[p]){"
           <> tStatement settings loopStatement 0
           <> "};"
           <> tStatement settings statement 0
