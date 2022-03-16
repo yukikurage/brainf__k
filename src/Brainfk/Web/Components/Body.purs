@@ -340,6 +340,12 @@ component = Hooks.component \_ _ -> Hooks.do
                             ]
                         ]
                     ]
+                , settingsItem "EOF"
+                    [ text "No change" ]
+                , settingsItem "Cell Overflow"
+                    [ text "Mod" ]
+                , settingsItem "Memory Overflow"
+                    [ text "Undefined" ]
                 ]
             ]
         ]
