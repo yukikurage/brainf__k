@@ -11,7 +11,7 @@ import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (slice)
-import Data.Time (diff)
+import Data.Time (Time(..), diff)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Milliseconds(..), delay, message)
 import Effect.Aff.Class (class MonadAff)
@@ -27,6 +27,7 @@ import Web.DOM.Element (scrollHeight, setScrollTop)
 import Web.Event.Event (stopPropagation)
 import Web.UIEvent.MouseEvent as MouseEvent
 
+diffS :: Time -> Time -> Number
 diffS a b =
   let
     Milliseconds d = diff a b
@@ -138,25 +139,24 @@ component = Hooks.component \_ _ -> Hooks.do
     [ css
         "h-screen w-screen font-inconsolata text-zinc-700 flex flex-col"
     ]
-    [ HH.div [ css "h-12 bg-white px-5 flex flex-row items-center" ] --Header
+    [ HH.div [ css "h-12 bg-white px-4 flex flex-row items-center" ] --Header
         [ HH.div
-            [ css "flex flex-row  items-end h-auto" ]
-            [ HH.div [ css "text-4xl pl-3 text-zinc-700" ]
-                [ text "Brainf" ]
-            , HH.div [ css "text-4xl text-fuchsia-500" ]
+            [ css "flex flex-row  items-end h-auto w-full" ]
+            [ HH.div [ css "text-3xl text-zinc-700" ]
+                [ text "Yuki Brainf" ]
+            , HH.div [ css "text-3xl text-fuchsia-500" ]
                 [ text "**" ]
-            , HH.div [ css "text-4xl pr-3 text-zinc-700" ]
-                [ text "k" ]
-            , HH.div [ css "text-xl pr-3 text-zinc-500" ]
-                [ text "interpreter by" ]
+            , HH.div [ css "text-3xl pr-3 text-zinc-700" ]
+                [ text "k " ]
+            , HH.div [ css "flex-grow" ] []
             , HH.a
                 [ css
                     "text-xl text-zinc-500 hover:text-zinc-700 cursor-pointer"
-                , href "https://twitter.com/yukikurage_2019"
+                , href "https://yukikurage.github.io/portfolio/#about"
                 , target "_blank"
                 , rel "noopener"
                 ]
-                [ text "yukikurage" ]
+                [ text "yukiworks" ]
             ]
         ]
     , HH.div
@@ -274,7 +274,7 @@ component = Hooks.component \_ _ -> Hooks.do
                           <> show transpileTime
                           <> ", Execute: "
                           <> show execTime
-                          <> ") (s)"
+                          <> ") s"
                     ]
                 ]
             ]
