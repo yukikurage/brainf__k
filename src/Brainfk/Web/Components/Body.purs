@@ -161,7 +161,9 @@ component = Hooks.component \_ _ -> Hooks.do
             ]
         ]
     , HH.div
-        [ css "flex-grow overflow-auto flex flex-col bg-zinc-100" ] --main
+        [ css
+            "flex-grow overflow-auto flex flex-col bg-zinc-100 min-w-[850px] min-h-[550px]"
+        ] --main
         [ HH.div [ css "h-11 p-2 flex flex-row items-end" ]
             [ button
                 [ onClick \_ -> runBrainfk
@@ -195,7 +197,7 @@ component = Hooks.component \_ _ -> Hooks.do
             ]
         , HH.div
             [ css "flex flex-row flex-grow" ]
-            [ HH.div [ css "h-full flex-[6] flex flex-col p-1" ]
+            [ HH.div [ css "h-full flex-[8] flex flex-col p-1" ]
                 [ textarea
                     [ value codeValue
                     , onValueInput \value -> do
@@ -217,7 +219,7 @@ component = Hooks.component \_ _ -> Hooks.do
                     , ref (RefLabel "CodeEditor")
                     ]
                 ]
-            , HH.div [ css "h-full flex-[6] flex flex-col" ]
+            , HH.div [ css "h-full flex-[7] flex flex-col" ]
                 [ HH.div [ css "text-xl p-1" ] [ text "Input" ]
                 , HH.div [ css "w-full flex-[2] p-1" ]
                     [ textarea
@@ -265,20 +267,20 @@ component = Hooks.component \_ _ -> Hooks.do
                         , ref $ RefLabel "OutputRef"
                         ]
                     ]
-                , HH.div [ css "p-1" ]
-                    [ text $
-                        if isRunning then "Running"
-                        else "Total time: "
-                          <> show (parseTime + transpileTime + execTime)
-                          <> " (Parse: "
-                          <> show parseTime
-                          <> ", Transpile: "
-                          <> show transpileTime
-                          <> ", Execute: "
-                          <> show execTime
-                          <> ") s"
-                    ]
                 ]
+            ]
+        , HH.div [ css "p-1" ]
+            [ text $
+                if isRunning then "Running"
+                else "Total time: "
+                  <> show (parseTime + transpileTime + execTime)
+                  <> " (Parse: "
+                  <> show parseTime
+                  <> ", Transpile: "
+                  <> show transpileTime
+                  <> ", Execute: "
+                  <> show execTime
+                  <> ") s"
             ]
         ]
     , HH.div
