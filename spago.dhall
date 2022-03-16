@@ -28,6 +28,7 @@ to generate this file without the comments in this block.
   , "lists"
   , "maybe"
   , "now"
+  , "ordered-collections"
   , "prelude"
   , "record"
   , "strings"
