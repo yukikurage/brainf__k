@@ -191,7 +191,7 @@ tCode code = (_.transpiled) $ applyStack $ go
                   (Map.delete 0 stacked) ->
                 let
                   reInternalLoop = go
-                    { pointer: state.position
+                    { pointer: state.pointer
                     , position: state.position + 1
                     , stacked: Map.empty
                     , effect: false
