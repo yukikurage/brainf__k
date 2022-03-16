@@ -4,9 +4,12 @@ import Prelude
 
 import Brainfk.System.Data.BrainfkAST (BrainfkAST(..), Command(..), Statement(..))
 import Control.Promise (Promise, toAff)
-import Data.Array (uncons)
-import Data.Maybe (Maybe(..))
+import Data.Array (filter, foldM, foldMap, uncons)
+import Data.Foldable (sum)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Ord (abs)
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
 import Effect (Effect)
 import Effect.Aff (Aff, Error)
 
@@ -88,6 +91,35 @@ tPrelude { memorySize, cellSize } input =
     Bit16 -> "16"
     Bit32 -> "32"
 
+showNeg :: Int -> String
+showNeg n = if n < 0 then show n else "+" <> show n
+
+mkMemoryAcc' :: Int -> String
+mkMemoryAcc' n =
+  if n == 0 then "m[p]"
+  else "m[p"
+    <> showNeg n
+    <> "]"
+
+checkLoopStatementOptimize
+  :: Statement
+  -> Maybe
+       (Array (Int /\ Int))
+checkLoopStatementOptimize (Statement commands) =
+  let
+    allPositions = foldM f (0 /\ []) commands
+    f (p /\ acc) = case _ of
+      PointerIncrement _ n -> pure ((p + n) /\ acc)
+      ReferenceIncrement _ n -> pure (p /\ (acc <> [ p /\ n ]))
+      _ -> Nothing
+    position = g =<< allPositions
+    g (0 /\ allPos)
+      | (allPos # filter (fst >>> (_ == 0)) # map snd # sum) == (-1) = Just $
+          filter (fst >>> (_ /= 0)) allPos
+    g _ = Nothing
+  in
+    position
+
 -- pointerPos に現在のポインターの位置をもちまわす
 -- while 文の最後にずらして補正
 tStatement
@@ -97,20 +129,14 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
     if pointerPos == 0 then ""
     else if pointerPos > 0 then "p+=" <> show pointerPos
       <> ";"
-    else "p-=" <> show (abs pointerPos)
+    else "p-=" <> show (abs pointerPos) <> ";"
   Just { head: command, tail } ->
     let
       statement = Statement tail
-      showNeg n = if n < 0 then show n else "+" <> show n
       mkMemoryAcc =
         if pointerPos == 0 then "m[p]"
         else "m[p"
           <> showNeg pointerPos
-          <> "]"
-      mkMemoryAcc' n =
-        if n == 0 then "m[p]"
-        else "m[p"
-          <> showNeg n
           <> "]"
     in
       case command of
@@ -118,34 +144,22 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
         Loop _ (Statement [ ReferenceIncrement _ (-1) ]) ->
           mkMemoryAcc <> "=0;" <> tStatement settings statement pointerPos
         -- memory swap optimizing
-        Loop _
-          ( Statement
-              [ ReferenceIncrement _ (-1)
-              , PointerIncrement _ n
-              , ReferenceIncrement _ x
-              , PointerIncrement _ m
-              ]
-          ) | n + m == 0 -> mkMemoryAcc' (pointerPos + n) <> "+="
-          <> (if x == 1 then "" else show x <> "*")
-          <> mkMemoryAcc
-          <> ";"
-          <> mkMemoryAcc
-          <> "=0;"
-          <> tStatement settings statement pointerPos
-        Loop _
-          ( Statement
-              [ PointerIncrement _ n
-              , ReferenceIncrement _ x
-              , PointerIncrement _ m
-              , ReferenceIncrement _ (-1)
-              ]
-          ) | n + m == 0 -> mkMemoryAcc' (pointerPos + n) <> "+="
-          <> (if x == 1 then "" else show x <> "*")
-          <> mkMemoryAcc
-          <> ";"
-          <> mkMemoryAcc
-          <> "=0;"
-          <> tStatement settings statement pointerPos
+        Loop _ loopStatement
+          | isJust (checkLoopStatementOptimize loopStatement) ->
+              case checkLoopStatementOptimize loopStatement of
+                Nothing -> ""
+                Just positions ->
+                  foldMap
+                    ( \(n /\ x) -> mkMemoryAcc' (pointerPos + n) <> "+="
+                        <> (if x == 1 then "" else show x <> "*")
+                        <> mkMemoryAcc
+                        <> ";"
+                    )
+                    positions
+                    <> mkMemoryAcc
+                    <> "=0;"
+                    <> tStatement settings statement pointerPos
+
         PointerIncrement _ n -> tStatement settings statement $ pointerPos + n
         ReferenceIncrement _ n -> mkMemoryAcc <> "+="
           <> show n

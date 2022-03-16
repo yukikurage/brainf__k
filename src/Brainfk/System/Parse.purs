@@ -4,10 +4,11 @@ import Prelude
 
 import Brainfk.System.Data.BrainfkAST (BrainfkAST(..), Command(..), Statement(..))
 import Brainfk.System.Data.Parser (ParseError(..), Parser, Token(..), runParser)
-import Brainfk.Util (whileM)
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Rec.Class (whileJust)
 import Control.Monad.State (get, put)
+import Data.Array (singleton)
 import Data.Array as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -98,7 +99,7 @@ pSpace =
   (pToken " " <|> pToken "\t" <|> pToken "\n" <|> pToken "\r") *> pure unit
 
 pMany :: forall a. Parser a -> Parser (Array a)
-pMany p = whileM $ (Just <$> try p) <|> pure Nothing
+pMany p = whileJust $ (Just <<< singleton <$> try p) <|> pure Nothing
 
 lexeme :: forall a. Parser a -> Parser a
 lexeme p = p <* pMany pSpace
