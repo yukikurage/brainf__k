@@ -43,18 +43,13 @@ foreign import exec_
        }
 
 exec
-  :: forall r
-   . Record (Settings r)
-  -> BrainfkAST
-  -> String
+  :: String
   -> Effect
        { getOutput :: Effect String
        , stop :: Effect Unit
        , waitFinish :: Aff (Maybe Error)
        }
-exec settings brainfkAST input = do
-  let
-    transpiled = transpile settings brainfkAST input
+exec transpiled = do
   res@{ waitFinish } <- exec_ Just Nothing
     transpiled
   pure res { waitFinish = toAff waitFinish }
@@ -186,4 +181,4 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
 
 tReturn :: String
 tReturn =
-  "postMessage('fi')"
+  "postMessage('f')"
