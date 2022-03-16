@@ -175,7 +175,17 @@ tCode code = (_.transpiled) $ applyStack $ go
           }
       in
         Loop $ case internalLoop of
-          -- ループ最適化
+          -- ループ最適化 [-]
+          { effect: false, pointer: 0, stacked }
+            | stacked == Map.singleton 0 (Add (-1)) ->
+                state
+                  { position = internalLoop.position
+                  , stacked = Map.insertWith compositeOperation
+                      state.pointer
+                      (Set 0)
+                      state.stacked
+                  }
+          -- ループ最適化 [->+<]
           { effect: false, pointer: 0, stacked }
             | Map.lookup 0 stacked == Just (Add (-1)) ->
                 beforeLoop
@@ -183,10 +193,7 @@ tCode code = (_.transpiled) $ applyStack $ go
                   , transpiled = beforeLoop.transpiled
                       <> fold
                         (map f $ Map.toUnfoldable $ Map.delete 0 $ stacked)
-                  , stacked = Map.insertWith compositeOperation
-                      beforeLoop.pointer
-                      (Set 0)
-                      beforeLoop.stacked
+                  , stacked = Map.singleton beforeLoop.pointer (Set 0)
                   }
                 where
                 beforeLoop = applyStack state
@@ -210,9 +217,11 @@ tCode code = (_.transpiled) $ applyStack $ go
                       <> tMemory beforeLoop.pointer
                       <>
                         ";"
-                f (n /\ (Set m)) = tMemory (n + beforeLoop.pointer) <> "="
+                f (n /\ (Set m)) = "if(" <> tMemory beforeLoop.pointer <> "){"
+                  <> tMemory (n + beforeLoop.pointer)
+                  <> "="
                   <> show m
-                  <> ";"
+                  <> ";}"
           -- それ以外
           _ ->
             let
@@ -257,7 +266,6 @@ tCode code = (_.transpiled) $ applyStack $ go
                   <> "=i.codePointAt(x);x=x+1;}"
               }
     _ -> Loop $ incr state
-
 
 tReturn :: String
 tReturn =
