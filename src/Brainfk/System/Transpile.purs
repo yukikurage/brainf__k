@@ -138,18 +138,6 @@ tCode code = (_.transpiled) $ applyStack $ go
       <> showNeg diff
       <> "]"
 
-  -- | pointer の位置をトランスパイラの内部位置にセット
-  -- | 不整合が起こるので内部的に applyStack を使っている
-  setPointer :: TCodeState -> TCodeState
-  setPointer state =
-    let
-      state'@{ pointer, transpiled } = applyStack state
-    in
-      state'
-        { pointer = 0
-        , transpiled = transpiled <> showNegCompute "p" pointer
-        }
-
   -- | stack にたまった値を取り出す
   applyStack :: TCodeState -> TCodeState
   applyStack state@{ stacked, transpiled } = state
