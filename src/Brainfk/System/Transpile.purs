@@ -81,7 +81,7 @@ w: Wait
 tPrelude :: forall r. Record (Settings r) -> String -> String
 tPrelude { memorySize, cellSize } input =
   "let p=0;let m=new Uint" <> bit <> "Array(" <> show memorySize
-    <> ").fill(0);let i="
+    <> ");let i="
     <> show input
     <>
       ";let x=0;"

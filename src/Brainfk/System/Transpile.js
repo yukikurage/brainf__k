@@ -1,10 +1,7 @@
 "use strict";
 
 exports.exec_ = (just) => (nothing) => (func) => () => {
-  const workerContent = `
-self.addEventListener('message',() => {
-  ${func}
-}, false);`;
+  const workerContent = `self.addEventListener('message',()=>{${func}},false);`;
 
   console.log(workerContent);
 
@@ -19,7 +16,7 @@ self.addEventListener('message',() => {
   worker.addEventListener(
     "message",
     (e) => {
-      if (e.data !== "fi") {
+      if (e.data !== "f") {
         output += String.fromCodePoint(e.data);
       }
     },
@@ -39,7 +36,7 @@ self.addEventListener('message',() => {
       worker.addEventListener(
         "message",
         (e) => {
-          if (e.data === "fi") {
+          if (e.data === "f") {
             worker.terminate();
             URL.revokeObjectURL(workerUrl);
             resolve(nothing);
