@@ -2,43 +2,32 @@ module Brainfk.System.Exec where
 
 import Prelude
 
-import Effect.Aff (Error)
+import Brainfk.System.Transpile (Transpiled(..))
+import Control.Promise (Promise, toAff)
+import Data.Maybe (Maybe(..))
+import Effect (Effect)
+import Effect.Aff (Aff, Error)
 
--- | OutOfRange max actual
-data ExecError
-  = OutOfMemoryRange Int Int
-  | OutOfInputRange Int Int
-  | InvalidCharCode Int
-  | ExceedsMaxStep Int
-  | ProcessKilled Error
+foreign import exec_
+  :: forall a
+   . (a -> Maybe a)
+  -> Maybe a
+  -> String
+  -> Effect
+       { getOutput :: Effect String
+       , stop :: Effect Unit
+       , waitFinish :: Promise (Maybe Error)
+       }
 
-instance Show ExecError where
-  show (OutOfMemoryRange max actual) = "Out of memory range: " <> show actual
-    <> " ∉ [0, "
-    <> show max
-    <> "]"
-  show (OutOfInputRange max actual) = "Out of input range: " <> show actual
-    <> " ∉ [0, "
-    <> show max
-    <> "]"
-  show (InvalidCharCode code) = "Invalid char code: " <> show code
-  show (ExceedsMaxStep max) = "Exceeds max step: " <> show max
-  show (ProcessKilled err) = "Process killed: " <> show err
-
-type Settings r =
-  ( memorySize :: Int
-  , cellSize :: Int
-  , chunkNum :: Int -- 1回のまとまりで処理する個数
-  , isLoopMemory :: Boolean --メモリの左端(あるいは右端)に到達したときにループするかどうか
-  , isLoopCell :: Boolean -- メモリのセルがオーバーフローしたときにループするかどうか
-  | r
-  )
-
-defaultSettings :: Record (Settings ())
-defaultSettings =
-  { memorySize: 256
-  , chunkNum: 5000
-  , isLoopMemory: true
-  , isLoopCell: true
-  , cellSize: 256
-  }
+-- | execute Transpiled Brainfuck code
+exec
+  :: Transpiled
+  -> Effect
+       { getOutput :: Effect String
+       , stop :: Effect Unit
+       , waitFinish :: Aff (Maybe Error)
+       }
+exec (Transpiled transpiled) = do
+  res@{ waitFinish } <- exec_ Just Nothing
+    transpiled
+  pure res { waitFinish = toAff waitFinish }

@@ -2,12 +2,10 @@ module Brainfk.Web.Components.Body where
 
 import Prelude
 
-import Brainfk.Data.Settings (defaultSettings)
-import Brainfk.System.Parse (parse)
-import Brainfk.System.Transpile (CellSize(..), exec, transpile)
+import Brainfk.System.Exec (exec)
+import Brainfk.System.Transpile (CellSize(..), defaultSettings, transpile)
 import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
-import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (slice)
@@ -46,17 +44,10 @@ component = Hooks.component \_ _ -> Hooks.do
   isRunning /\ isRunningId <- useState false
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
   settings /\ settingsId <- useState defaultSettings
-  parseTime /\ parseTimeId <- useState 0.0
   transpileTime /\ transpileTimeId <- useState 0.0
   execTime /\ execTimeId <- useState 0.0
 
   let
-
-    checkParseError v = case parse settings v of
-      Right _ -> pure unit
-      Left parseError -> do
-        put outputTextId $ show parseError
-
     autoScroll = do
       outputRef <- getRef $ RefLabel "OutputRef"
 
@@ -70,63 +61,51 @@ component = Hooks.component \_ _ -> Hooks.do
       stopEffect
       put outputTextId ""
       put isRunningId true
-      put parseTimeId 0.0
       put transpileTimeId 0.0
       put execTimeId 0.0
 
-      parseBeforeTime <- liftEffect nowTime
+      transpileBeforeTime <- liftEffect nowTime
+      let transpiled = transpile settings codeValue inputValue
+      transpileAfterTime <- liftEffect nowTime
+      put transpileTimeId $ diffS transpileAfterTime transpileBeforeTime
 
-      case parse settings codeValue of
-        Left parseError -> do
-          put outputTextId $ show parseError
-          put isRunningId false
-        Right ast -> do
-          parseAfterTime <- liftEffect nowTime
-          put parseTimeId $ diffS parseAfterTime parseBeforeTime
+      execBeforeTime <- liftEffect nowTime
+      { getOutput, stop, waitFinish } <- liftEffect $ exec transpiled
 
-          transpileBeforeTime <- liftEffect nowTime
-          let transpiled = transpile settings ast inputValue
-          transpileAfterTime <- liftEffect nowTime
-          put transpileTimeId $ diffS transpileAfterTime transpileBeforeTime
+      updateForkId <- fork $ forever do
+        output <- liftEffect getOutput
+        modify_ outputTextId
+          ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+              (prev <> output)
+          )
 
-          execBeforeTime <- liftEffect nowTime
-          { getOutput, stop, waitFinish } <- liftEffect
-            $ exec transpiled
+        autoScroll
 
-          updateForkId <- fork $ forever do
-            output <- liftEffect getOutput
+        liftAff $ delay $ Milliseconds $ 100.0
+
+      _ <- fork do
+        runtimeErrorMaybe <- liftAff waitFinish
+
+        kill updateForkId
+        output <- liftEffect getOutput
+        modify_ outputTextId
+          ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+              (prev <> output)
+          )
+        autoScroll
+        put isRunningId false
+        execAfterTime <- liftEffect nowTime
+
+        put execTimeId $ execAfterTime `diffS` execBeforeTime
+        case runtimeErrorMaybe of
+          Just runtimeError -> do
             modify_ outputTextId
-              ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
-                  (prev <> output)
-              )
+              (\prev -> prev <> "\nError: " <> message runtimeError)
+          Nothing -> pure unit
 
-            autoScroll
-
-            liftAff $ delay $ Milliseconds $ 100.0
-
-          _ <- fork do
-            runtimeErrorMaybe <- liftAff waitFinish
-
-            kill updateForkId
-            output <- liftEffect getOutput
-            modify_ outputTextId
-              ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
-                  (prev <> output)
-              )
-            autoScroll
-            put isRunningId false
-            execAfterTime <- liftEffect nowTime
-
-            put execTimeId $ execAfterTime `diffS` execBeforeTime
-            case runtimeErrorMaybe of
-              Just runtimeError -> do
-                modify_ outputTextId
-                  (\prev -> prev <> "\nError: " <> message runtimeError)
-              Nothing -> pure unit
-
-          put stopEffectId $ do
-            liftEffect stop
-            kill updateForkId
+      put stopEffectId $ do
+        liftEffect stop
+        kill updateForkId
 
   let
     settingsItem label child = HH.div [ css "w-auto flex flex-row" ]
@@ -273,10 +252,8 @@ component = Hooks.component \_ _ -> Hooks.do
             [ text $
                 if isRunning then "Running"
                 else "Total time: "
-                  <> show (parseTime + transpileTime + execTime)
-                  <> " (Parse: "
-                  <> show parseTime
-                  <> ", Transpile: "
+                  <> show (transpileTime + execTime)
+                  <> " (Transpile: "
                   <> show transpileTime
                   <> ", Execute: "
                   <> show execTime
@@ -292,7 +269,6 @@ component = Hooks.component \_ _ -> Hooks.do
                 else "invisible opacity-0"
         , onClick \_ -> do
             put isSettingsModalOpenId false
-            checkParseError codeValue
         ] -- Modal
         [ HH.div
             [ css $
@@ -301,142 +277,70 @@ component = Hooks.component \_ _ -> Hooks.do
                     if isSettingsModalOpen then "" else "scale-[0.96]"
             , onClick \e -> liftEffect $ stopPropagation $ MouseEvent.toEvent e
             ]
-            [ HH.div [ css "right-0 flex flex-row justify-end mb-3" ]
-                [ button
+            [ HH.div [ css "right-0 flex flex-row mb-6" ]
+                [ HH.div [ css "text-2xl" ] [ text "Settings" ]
+                , HH.div [ css "flex-grow" ] []
+                , button
                     [ onClick \_ -> do
                         put isSettingsModalOpenId false
-                        checkParseError codeValue
                     , css
                         "text-zinc-500 transition hover:text-zinc-600 disabled:text-zinc-300"
                     ]
                     [ icon "fa-solid fa-xmark fa-2xl" ]
                 ]
-            , HH.div [ css "flex flex-row w-full gap-6" ]
-                [ HH.div [ css "flex flex-col h-full flex-grow gap-3 text-lg" ]
-                    [ HH.div [ css "text-xl" ] [ text "Parse Settings" ]
-                    , settingsItem "Pointer Increment"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.pointerIncrement
-                            , onValueInput \value -> putRecord settingsId
-                                { pointerIncrement: value }
-                            ]
-                        ]
-                    , settingsItem "Pointer Decrement"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.pointerDecrement
-                            , onValueInput \value -> putRecord settingsId
-                                { pointerDecrement: value }
-                            ]
-                        ]
-                    , settingsItem "Value Increment"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.referenceIncrement
-                            , onValueInput \value -> putRecord settingsId
-                                { referenceIncrement: value }
-                            ]
-                        ]
-                    , settingsItem "Value Decrement"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.referenceDecrement
-                            , onValueInput \value -> putRecord settingsId
-                                { referenceDecrement: value }
-                            ]
-                        ]
-                    , settingsItem "Output"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.output
-                            , onValueInput \value -> putRecord settingsId
-                                { output: value }
-                            ]
-                        ]
-                    , settingsItem "Input"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.input
-                            , onValueInput \value -> putRecord settingsId
-                                { input: value }
-                            ]
-                        ]
-                    , settingsItem "Loop Start"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.loopStart
-                            , onValueInput \value -> putRecord settingsId
-                                { loopStart: value }
-                            ]
-                        ]
-                    , settingsItem "Loop End"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , value $ settings.loopEnd
-                            , onValueInput \value -> putRecord settingsId
-                                { loopEnd: value }
-                            ]
+            , HH.div [ css "flex flex-col h-full flex-grow gap-3 text-lg" ]
+                [ settingsItem "Memory Size"
+                    [ HH.input
+                        [ css "w-40 font-roboto"
+                        , type_ $ InputNumber
+                        , value $ show $ settings.memorySize
+                        , onValueInput \value -> modifyRecord settingsId
+                            \{ memorySize } ->
+                              { memorySize: fromMaybe memorySize $
+                                  Int.fromString value
+                              }
                         ]
                     ]
-                , HH.div [ css "flex flex-col h-full flex-grow gap-3 text-lg" ]
-                    [ HH.div [ css "text-xl" ] [ text "Exec Settings" ]
-                    , settingsItem "Memory Size"
-                        [ HH.input
-                            [ css "w-40 font-roboto"
-                            , type_ $ InputNumber
-                            , value $ show $ settings.memorySize
-                            , onValueInput \value -> modifyRecord settingsId
-                                \{ memorySize } ->
-                                  { memorySize: fromMaybe memorySize $
-                                      Int.fromString value
-                                  }
+                , settingsItem "Cell Size"
+                    [ HH.div
+                        [ css "flex flex-col gap-3" ]
+                        [ HH.div [ css "flex flex-row gap-2 items-center" ]
+                            [ HH.input
+                                [ type_ $ InputRadio
+                                , checked $ settings.cellSize == Bit8
+                                , onValueInput \_ -> putRecord
+                                    settingsId
+                                    { cellSize: Bit8 }
+                                , name "CellSize"
+                                ]
+                            , HH.text "8 bit"
+                            ]
+                        , HH.div [ css "flex flex-row gap-2 items-center" ]
+                            [ HH.input
+                                [ type_ $ InputRadio
+                                , checked $ settings.cellSize == Bit16
+                                , onValueInput \_ -> putRecord
+                                    settingsId
+                                    { cellSize: Bit16 }
+                                , name "CellSize"
+                                ]
+                            , HH.text "16 bit"
+                            ]
+                        , HH.div
+                            [ css "flex flex-row gap-2 items-center" ]
+                            [ HH.input
+                                [ type_ $ InputRadio
+                                , checked $ settings.cellSize == Bit32
+                                , onValueInput \_ -> putRecord
+                                    settingsId
+                                    { cellSize: Bit32 }
+                                , name "CellSize"
+                                ]
+                            , HH.text "32 bit"
                             ]
                         ]
-                    , settingsItem "Cell Size"
-                        [ HH.div
-                            [ css "flex flex-col gap-3" ]
-                            [ HH.div [ css "flex flex-row gap-2 items-center" ]
-                                [ HH.input
-                                    [ type_ $ InputRadio
-                                    , checked $ settings.cellSize == Bit8
-                                    , onValueInput \_ -> putRecord
-                                        settingsId
-                                        { cellSize: Bit8 }
-                                    , name "CellSize"
-                                    ]
-                                , HH.text "8 bit"
-                                ]
-                            , HH.div [ css "flex flex-row gap-2 items-center" ]
-                                [ HH.input
-                                    [ type_ $ InputRadio
-                                    , checked $ settings.cellSize == Bit16
-                                    , onValueInput \_ -> putRecord
-                                        settingsId
-                                        { cellSize: Bit16 }
-                                    , name "CellSize"
-                                    ]
-                                , HH.text "16 bit"
-                                ]
-                            , HH.div
-                                [ css "flex flex-row gap-2 items-center" ]
-                                [ HH.input
-                                    [ type_ $ InputRadio
-                                    , checked $ settings.cellSize == Bit32
-                                    , onValueInput \_ -> putRecord
-                                        settingsId
-                                        { cellSize: Bit32 }
-                                    , name "CellSize"
-                                    ]
-                                , HH.text "32 bit"
-                                ]
-                            ]
-                        ]
-
                     ]
                 ]
-
             ]
-
         ]
     ]
