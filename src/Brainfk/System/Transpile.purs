@@ -165,7 +165,7 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
             <> mkMemoryAcc
             <> "=i.codePointAt(x);x++;"
             <> tStatement settings statement pointerPos
-            <> "};"
+            <> "}"
         Output _ -> "postMessage("
           <> mkMemoryAcc
           <> ");"
@@ -177,9 +177,9 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
             <>
               "while(m[p]){"
             <> tStatement settings loopStatement 0
-            <> "};"
+            <> "}"
             <> tStatement settings statement 0
 
 tReturn :: String
 tReturn =
-  "postMessage('f')"
+  "postMessage('f');"
