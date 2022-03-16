@@ -76,10 +76,8 @@ showNegCompute :: String -> Int -> String
 showNegCompute left n = case n of
   0 -> ""
   _ -> left <> case n of
-    1 -> "++;"
-    (-1) -> "--;"
-    x | x > 0 -> "+=" <> show x <> ";"
-    x -> "-=" <> show (abs x) <> ";"
+    x | x > 0 -> "=" <> left <> "+" <> show x <> ";"
+    x -> "=" <> left <> "-" <> show (abs x) <> ";"
 
 mkMemoryAcc' :: Int -> String
 mkMemoryAcc' n =
@@ -91,10 +89,20 @@ mkMemoryAcc' n =
 type TCodeState =
   { pointer :: Int
   , position :: Int
-  , stacked :: Map Int Int
+  , stacked :: Map Int Operation
   , effect :: Boolean
   , transpiled :: String
   }
+
+data Operation = Add Int | Set Int
+
+derive instance Eq Operation
+derive instance Ord Operation
+
+compositeOperation :: Operation -> Operation -> Operation
+compositeOperation _ (Set m) = Set m
+compositeOperation (Add n) (Add m) = Add (n + m)
+compositeOperation (Set n) (Add m) = Set $ n + m
 
 tCode :: String -> String
 tCode code = (_.transpiled) $ applyStack $ go
@@ -141,8 +149,9 @@ tCode code = (_.transpiled) $ applyStack $ go
     , effect = true
     }
     where
-    f :: Int /\ Int -> String
-    f (n /\ m) = showNegCompute (tMemory n) m
+    f :: Int /\ Operation -> String
+    f (n /\ (Add m)) = showNegCompute (tMemory n) m
+    f (n /\ (Set m)) = tMemory n <> "=" <> show m <> ";"
 
   go state = tailRec goTailRec state
 
@@ -168,35 +177,42 @@ tCode code = (_.transpiled) $ applyStack $ go
         Loop $ case internalLoop of
           -- ループ最適化
           { effect: false, pointer: 0, stacked }
-            | Map.lookup 0 stacked == Just (-1) ->
+            | Map.lookup 0 stacked == Just (Add (-1)) ->
                 beforeLoop
                   { position = internalLoop.position
                   , transpiled = beforeLoop.transpiled
                       <> fold
                         (map f $ Map.toUnfoldable $ Map.delete 0 $ stacked)
-                      <> tMemory beforeLoop.pointer
-                      <> "=0;"
+                  , stacked = Map.insertWith compositeOperation
+                      beforeLoop.pointer
+                      (Set 0)
+                      beforeLoop.stacked
                   }
                 where
                 beforeLoop = applyStack state
-                f (n /\ m) = case m of
+                f (n /\ (Add m)) = case m of
                   0 -> ""
-                  1 -> tMemory (n + beforeLoop.pointer) <> "+="
-                    <> tMemory beforeLoop.pointer
-                    <> ";"
-                  (-1) -> tMemory (n + beforeLoop.pointer) <> "-="
-                    <> tMemory beforeLoop.pointer
-                    <> ";"
-                  x | x > 0 -> tMemory (n + beforeLoop.pointer) <> "+="
-                    <> show x
-                    <> "*"
-                    <> tMemory beforeLoop.pointer
-                    <> ";"
-                  x -> tMemory (n + beforeLoop.pointer) <> "-=" <> show (abs x)
-                    <> "*"
-                    <> tMemory beforeLoop.pointer
-                    <>
-                      ";"
+                  _ -> tMemory (n + beforeLoop.pointer) <> case m of
+                    1 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
+                      <> tMemory beforeLoop.pointer
+                      <> ";"
+                    (-1) -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
+                      <> tMemory beforeLoop.pointer
+                      <> ";"
+                    x | x > 0 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
+                      <> show x
+                      <> "*"
+                      <> tMemory beforeLoop.pointer
+                      <> ";"
+                    x -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
+                      <> show (abs x)
+                      <> "*"
+                      <> tMemory beforeLoop.pointer
+                      <>
+                        ";"
+                f (n /\ (Set m)) = tMemory (n + beforeLoop.pointer) <> "="
+                  <> show m
+                  <> ";"
           -- それ以外
           _ ->
             let
@@ -212,9 +228,13 @@ tCode code = (_.transpiled) $ applyStack $ go
     Just '>' -> Loop $ incr $ state { pointer = state.pointer + 1 }
     Just '<' -> Loop $ incr $ state { pointer = state.pointer - 1 }
     Just '+' -> Loop $ incr $ state
-      { stacked = Map.insertWith (+) state.pointer 1 state.stacked }
+      { stacked = Map.insertWith compositeOperation state.pointer (Add 1)
+          state.stacked
+      }
     Just '-' -> Loop $ incr $ state
-      { stacked = Map.insertWith (+) state.pointer (-1) state.stacked }
+      { stacked = Map.insertWith compositeOperation state.pointer (Add $ -1)
+          state.stacked
+      }
     Just '.' ->
       let
         prev = applyStack state
@@ -234,93 +254,10 @@ tCode code = (_.transpiled) $ applyStack $ go
           $ prev
               { transpiled = prev.transpiled <> "if(x<i.length){"
                   <> tMemory prev.pointer
-                  <> "=i.codePointAt(x);x++;}"
+                  <> "=i.codePointAt(x);x=x+1;}"
               }
     _ -> Loop $ incr state
 
--- checkLoopStatementOptimize
---   :: String
---   -> Maybe
---        (Map Int Int)
--- checkLoopStatementOptimize code =
---   let
---     allPositions = foldM f (0 /\ []) $ toCharArray code
---     f (p /\ acc) = case _ of
---       '>' -> pure ((p + n) /\ acc)
---       ReferenceIncrement _ n -> pure (p /\ (acc <> [ p /\ n ]))
---       _ -> Nothing
---     position = g =<< allPositions
---     g (0 /\ allPos)
---       | (allPos # filter (fst >>> (_ == 0)) # map snd # sum) == (-1) = Just $
---           filter (fst >>> (_ /= 0)) allPos
---     g _ = Nothing
---   in
---     position
-
--- -- pointerPos に現在のポインターの位置をもちまわす
--- -- while 文の最後にずらして補正
--- tStatement
---   :: forall r. Record (Settings r) -> Statement -> Int -> String
--- tStatement settings (Statement commands) pointerPos = case uncons commands of
---   Nothing ->
---     if pointerPos == 0 then ""
---     else if pointerPos > 0 then "p+=" <> show pointerPos
---       <> ";"
---     else "p-=" <> show (abs pointerPos) <> ";"
---   Just { head: command, tail } ->
---     let
---       statement = Statement tail
---       mkMemoryAcc =
---         if pointerPos == 0 then "m[p]"
---         else "m[p"
---           <> showNeg pointerPos
---           <> "]"
---     in
---       case command of
---         -- memory clear optimizing
---         Loop _ (Statement [ ReferenceIncrement _ (-1) ]) ->
---           mkMemoryAcc <> "=0;" <> tStatement settings statement pointerPos
---         -- memory swap optimizing
---         Loop _ loopStatement
---           | isJust (checkLoopStatementOptimize loopStatement) ->
---               case checkLoopStatementOptimize loopStatement of
---                 Nothing -> ""
---                 Just positions ->
---                   foldMap
---                     ( \(n /\ x) -> mkMemoryAcc' (pointerPos + n) <> "+="
---                         <> (if x == 1 then "" else show x <> "*")
---                         <> mkMemoryAcc
---                         <> ";"
---                     )
---                     positions
---                     <> mkMemoryAcc
---                     <> "=0;"
---                     <> tStatement settings statement pointerPos
-
---         PointerIncrement _ n -> tStatement settings statement $ pointerPos + n
---         ReferenceIncrement _ n -> mkMemoryAcc <> "+="
---           <> show n
---           <> ";"
---           <> tStatement settings statement pointerPos
---         Input _ ->
---           "if(x<i.length){"
---             <> mkMemoryAcc
---             <> "=i.codePointAt(x);x++;"
---             <> tStatement settings statement pointerPos
---             <> "}"
---         Output _ -> "postMessage("
---           <> mkMemoryAcc
---           <> ");"
---           <> tStatement settings statement pointerPos
---         Loop _ loopStatement ->
---           ( if pointerPos == 0 then ""
---             else "p+=" <> show pointerPos <> ";"
---           )
---             <>
---               "while(m[p]){"
---             <> tStatement settings loopStatement 0
---             <> "}"
---             <> tStatement settings statement 0
 
 tReturn :: String
 tReturn =
