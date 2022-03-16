@@ -138,6 +138,18 @@ tCode code = (_.transpiled) $ applyStack $ go
       <> showNeg diff
       <> "]"
 
+  -- | pointer の位置をトランスパイラの内部位置にセット
+  -- | 不整合が起こるので内部的に applyStack を使っている
+  setPointer :: TCodeState -> TCodeState
+  setPointer state =
+    let
+      state'@{ pointer, transpiled } = applyStack state
+    in
+      state'
+        { pointer = 0
+        , transpiled = transpiled <> showNegCompute "p" pointer
+        }
+
   -- | stack にたまった値を取り出す
   applyStack :: TCodeState -> TCodeState
   applyStack state@{ stacked, transpiled } = state
@@ -164,7 +176,7 @@ tCode code = (_.transpiled) $ applyStack $ go
     Just '[' ->
       let
         internalLoop = go
-          { pointer: state.pointer
+          { pointer: 0
           , position: state.position + 1
           , stacked: Map.empty
           , effect: false
@@ -173,73 +185,73 @@ tCode code = (_.transpiled) $ applyStack $ go
       in
         Loop $ case internalLoop of
           --ループ最適化 [-]
-          { effect: false, pointer: p, stacked }
-            | p == state.pointer
-                && Map.lookup state.pointer stacked == Just (Add (-1))
+          { effect: false, pointer: 0, stacked }
+            | Map.lookup 0 stacked == Just (Add (-1))
                 && all isSet
-                  (Map.delete state.pointer stacked) ->
-                state
-                  { position = internalLoop.position
-                  , stacked =
-                      Map.insertWith compositeOperation state.pointer (Set 0)
-                        $ Map.unionWith compositeOperation state.stacked
-                        $ (Map.delete state.pointer stacked)
-                  }
+                  (Map.delete 0 stacked) ->
+                let
+                  reInternalLoop = go
+                    { pointer: state.position
+                    , position: state.position + 1
+                    , stacked: Map.empty
+                    , effect: false
+                    , transpiled: ""
+                    }
+                in
+                  state
+                    { position = internalLoop.position
+                    , stacked =
+                        Map.insertWith compositeOperation state.pointer (Set 0)
+                          $ Map.unionWith compositeOperation state.stacked
+                          $ Map.delete state.pointer reInternalLoop.stacked
+                    }
           -- ループ最適化 [->+<]
-          { effect: false, pointer: p, stacked }
-            | p == state.pointer && Map.lookup state.pointer stacked == Just
-                (Add (-1)) ->
+          { effect: false, pointer: 0, stacked }
+            | Map.lookup 0 stacked == Just (Add (-1)) ->
                 beforeLoop
                   { position = internalLoop.position
                   , transpiled = beforeLoop.transpiled
                       <> fold
-                        ( map f $ Map.toUnfoldable $ Map.delete state.pointer $
-                            stacked
-                        )
+                        (map f $ Map.toUnfoldable $ Map.delete 0 $ stacked)
                   , stacked = Map.singleton beforeLoop.pointer (Set 0)
                   }
                 where
                 beforeLoop = applyStack state
                 f (n /\ (Add m)) = case m of
                   0 -> ""
-                  _ -> tMemory n <> case m of
-                    1 -> "=" <> tMemory n <> "+"
+                  _ -> tMemory (n + beforeLoop.pointer) <> case m of
+                    1 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
                       <> tMemory beforeLoop.pointer
                       <> ";"
-                    (-1) -> "=" <> tMemory n <> "-"
+                    (-1) -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
                       <> tMemory beforeLoop.pointer
                       <> ";"
-                    x | x > 0 -> "=" <> tMemory n <> "+"
+                    x | x > 0 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
                       <> show x
                       <> "*"
                       <> tMemory beforeLoop.pointer
                       <> ";"
-                    x -> "=" <> tMemory n <> "-"
+                    x -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
                       <> show (abs x)
                       <> "*"
                       <> tMemory beforeLoop.pointer
                       <>
                         ";"
                 f (n /\ (Set m)) = "if(" <> tMemory beforeLoop.pointer <> "){"
-                  <> tMemory n
+                  <> tMemory (n + beforeLoop.pointer)
                   <> "="
                   <> show m
                   <> ";}"
           -- それ以外
           _ ->
             let
-              appliedInternalLoop = applyStack internalLoop
-              beforeLoop = applyStack state
+              appliedInternalLoop = setPointer internalLoop
+              beforeLoop = setPointer state
             in
               beforeLoop
                 { position = appliedInternalLoop.position
-                , transpiled = beforeLoop.transpiled <> "while("
-                    <> tMemory beforeLoop.pointer
-                    <> "){"
+                , transpiled = beforeLoop.transpiled <> "while(m[p]){"
                     <> appliedInternalLoop.transpiled
-                    <> "p=p"
-                    <> showNeg (appliedInternalLoop.pointer - state.pointer)
-                    <> ";"
                     <> "}"
                 }
     Just '>' -> Loop $ incr $ state { pointer = state.pointer + 1 }
