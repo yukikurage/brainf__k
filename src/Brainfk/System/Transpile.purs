@@ -161,10 +161,11 @@ tStatement settings (Statement commands) pointerPos = case uncons commands of
           <> ";"
           <> tStatement settings statement pointerPos
         Input _ ->
-          "if(x>=i.length){throw new Error('Exceeds Input Range');};"
+          "if(x<i.length){"
             <> mkMemoryAcc
             <> "=i.codePointAt(x);x++;"
             <> tStatement settings statement pointerPos
+            <> "};"
         Output _ -> "postMessage("
           <> mkMemoryAcc
           <> ");"

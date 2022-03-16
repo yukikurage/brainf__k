@@ -11,7 +11,7 @@ import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (slice)
-import Data.Time (Time(..), diff)
+import Data.Time (Time, diff)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Milliseconds(..), delay, message)
 import Effect.Aff.Class (class MonadAff)
@@ -51,6 +51,7 @@ component = Hooks.component \_ _ -> Hooks.do
   execTime /\ execTimeId <- useState 0.0
 
   let
+
     checkParseError v = case parse settings v of
       Right _ -> pure unit
       Left parseError -> do
@@ -213,6 +214,7 @@ component = Hooks.component \_ _ -> Hooks.do
                       text-zinc-700
                       border-none
                       outline-zinc-300"""
+                    , ref (RefLabel "CodeEditor")
                     ]
                 ]
             , HH.div [ css "h-full flex-[6] flex flex-col" ]
