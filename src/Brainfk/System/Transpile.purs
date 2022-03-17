@@ -18,6 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Ord (abs)
 import Data.String.CodeUnits (charAt)
 import Data.Tuple.Nested (type (/\), (/\))
+import Debug (debugger, traceM)
 
 newtype Transpiled = Transpiled String
 
@@ -194,7 +195,7 @@ tLoop = do
                           Add v' -> Add $ v' * m
                           _ -> v
                       )
-                      ( Map.toUnfoldable s.stack
+                      ( Map.toUnfoldable l.stack
                           :: Array (Int /\ Operation Int)
                       )
               }
@@ -212,6 +213,7 @@ tLoop = do
                 Add v -> do
                   applyStackI (s.pointer + i)
                   addTranspile $ case v of
+                    0 -> ""
                     1 -> tMemory (s.pointer + i) <> "+=" <> tMemory s.pointer <>
                       ";"
                     (-1) -> tMemory (s.pointer + i) <> "-=" <> tMemory s.pointer
