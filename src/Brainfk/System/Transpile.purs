@@ -7,7 +7,7 @@ import Data.Array (fold)
 import Data.Foldable (all)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Ord (abs)
 import Data.String.CodeUnits as CodeUnits
 import Data.Tuple.Nested (type (/\), (/\))
@@ -77,8 +77,10 @@ showNegCompute :: String -> Int -> String
 showNegCompute left n = case n of
   0 -> ""
   _ -> left <> case n of
-    x | x > 0 -> "=" <> left <> "+" <> show x <> ";"
-    x -> "=" <> left <> "-" <> show (abs x) <> ";"
+    1 -> "++;"
+    (-1) -> "--;"
+    x | x > 0 -> "+=" <> show x <> ";"
+    x -> "-=" <> show (abs x) <> ";"
 
 mkMemoryAcc' :: Int -> String
 mkMemoryAcc' n =
@@ -91,7 +93,6 @@ type TCodeState =
   { pointer :: Int
   , position :: Int
   , stacked :: Map Int Operation
-  , effect :: Boolean
   , transpiled :: String
   }
 
@@ -118,7 +119,6 @@ tCode code = (_.transpiled) $ applyStack $ go
   { pointer: 0
   , position: 0
   , stacked: Map.empty
-  , effect: false
   , transpiled: ""
   }
   where
@@ -155,7 +155,6 @@ tCode code = (_.transpiled) $ applyStack $ go
   applyStack state@{ stacked, transpiled } = state
     { stacked = Map.empty
     , transpiled = transpiled <> fold (map f $ Map.toUnfoldable stacked)
-    , effect = true
     }
     where
     f :: Int /\ Operation -> String
@@ -167,7 +166,6 @@ tCode code = (_.transpiled) $ applyStack $ go
   -- | pointer: ポインタ位置
   -- | position: コードの位置
   -- | stacked: 変数の操作のスタック．エフェクト (.,[]) が発生したら transpiled に適用し空にする
-  -- | effect: applyStack が呼ばれると true になる
   -- | transpiled: トランスパイルされたコード
   goTailRec :: TCodeState -> Step TCodeState TCodeState
   goTailRec state = case token state of
@@ -179,34 +177,56 @@ tCode code = (_.transpiled) $ applyStack $ go
           { pointer: 0
           , position: state.position + 1
           , stacked: Map.empty
-          , effect: false
           , transpiled: ""
           }
       in
         Loop $ case internalLoop of
-          --ループ最適化 [-]
-          { effect: false, pointer: 0, stacked }
+          --ループ最適化1
+          { transpiled: "", pointer: 0, stacked }
             | Map.lookup 0 stacked == Just (Add (-1))
                 && all isSet
                   (Map.delete 0 stacked) ->
+                state
+                  { position = internalLoop.position
+                  , stacked =
+                      Map.insertWith compositeOperation state.pointer (Set 0)
+                        $ Map.unionWith compositeOperation state.stacked
+                        $ Map.fromFoldable
+                        $ map (\(k /\ v) -> ((k + state.pointer) /\ v))
+                        $
+                          ( Map.toUnfoldable $ Map.delete 0 stacked
+                              :: Array (Int /\ Operation)
+                          )
+                  }
+          -- ループ最適化2
+          { transpiled: "", pointer: 0, stacked }
+            | Map.lookup 0 stacked == Just (Add (-1)) &&
+                maybe false isSet (Map.lookup state.pointer state.stacked) ->
                 let
-                  reInternalLoop = go
-                    { pointer: state.pointer
-                    , position: state.position + 1
-                    , stacked: Map.empty
-                    , effect: false
-                    , transpiled: ""
-                    }
+                  v0' = Map.lookup state.pointer state.stacked
+                  v0 = case v0' of
+                    Just (Set x) -> x
+                    _ -> 0
                 in
                   state
                     { position = internalLoop.position
                     , stacked =
                         Map.insertWith compositeOperation state.pointer (Set 0)
                           $ Map.unionWith compositeOperation state.stacked
-                          $ Map.delete state.pointer reInternalLoop.stacked
+                          $ Map.fromFoldable
+                          $ map
+                              ( \(k /\ v) -> (k + state.pointer) /\ case v of
+                                  Set x -> Set x
+                                  Add x -> Add $ x * v0
+                              )
+                          $
+                            ( Map.toUnfoldable $ Map.delete 0 stacked
+                                :: Array (Int /\ Operation)
+                            )
                     }
-          -- ループ最適化 [->+<]
-          { effect: false, pointer: 0, stacked }
+
+          -- ループ最適化3
+          { transpiled: "", pointer: 0, stacked }
             | Map.lookup 0 stacked == Just (Add (-1)) ->
                 beforeLoop
                   { position = internalLoop.position
@@ -220,18 +240,16 @@ tCode code = (_.transpiled) $ applyStack $ go
                 f (n /\ (Add m)) = case m of
                   0 -> ""
                   _ -> tMemory (n + beforeLoop.pointer) <> case m of
-                    1 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
+                    1 -> "+="
                       <> tMemory beforeLoop.pointer
                       <> ";"
-                    (-1) -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
-                      <> tMemory beforeLoop.pointer
+                    (-1) -> "-=" <> tMemory beforeLoop.pointer
                       <> ";"
-                    x | x > 0 -> "=" <> tMemory (n + beforeLoop.pointer) <> "+"
-                      <> show x
+                    x | x > 0 -> "+=" <> show x
                       <> "*"
                       <> tMemory beforeLoop.pointer
                       <> ";"
-                    x -> "=" <> tMemory (n + beforeLoop.pointer) <> "-"
+                    x -> "-="
                       <> show (abs x)
                       <> "*"
                       <> tMemory beforeLoop.pointer
