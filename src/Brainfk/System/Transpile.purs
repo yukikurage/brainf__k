@@ -18,7 +18,6 @@ import Data.Maybe (Maybe(..))
 import Data.Ord (abs)
 import Data.String.CodeUnits (charAt)
 import Data.Tuple.Nested (type (/\), (/\))
-import Debug (debugger, traceM)
 
 newtype Transpiled = Transpiled String
 
