@@ -6,6 +6,7 @@ import Brainfk.System.Exec (exec)
 import Brainfk.System.Transpile (CellSize(..), defaultSettings, transpile)
 import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
+import Data.Int (floor)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (slice)
@@ -25,12 +26,12 @@ import Web.DOM.Element (scrollHeight, setScrollTop)
 import Web.Event.Event (stopPropagation)
 import Web.UIEvent.MouseEvent as MouseEvent
 
-diffS :: Time -> Time -> Number
+diffS :: Time -> Time -> Int
 diffS a b =
   let
     Milliseconds d = diff a b
   in
-    d / 1000.0
+    floor d
 
 component
   :: forall query input output m
@@ -44,8 +45,8 @@ component = Hooks.component \_ _ -> Hooks.do
   isRunning /\ isRunningId <- useState false
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
   settings /\ settingsId <- useState defaultSettings
-  transpileTime /\ transpileTimeId <- useState 0.0
-  execTime /\ execTimeId <- useState 0.0
+  transpileTime /\ transpileTimeId <- useState 0
+  execTime /\ execTimeId <- useState 0
 
   let
     autoScroll = do
@@ -61,8 +62,8 @@ component = Hooks.component \_ _ -> Hooks.do
       stopEffect
       put outputTextId ""
       put isRunningId true
-      put transpileTimeId 0.0
-      put execTimeId 0.0
+      put transpileTimeId 0
+      put execTimeId 0
 
       transpileBeforeTime <- liftEffect nowTime
       let transpiled = transpile settings codeValue inputValue
@@ -257,7 +258,7 @@ component = Hooks.component \_ _ -> Hooks.do
                   <> show transpileTime
                   <> ", Execute: "
                   <> show execTime
-                  <> ") s"
+                  <> ") ms"
             ]
         ]
     , HH.div
