@@ -188,6 +188,7 @@ tLoop = do
             -- 最適化2
             Just (Set m) -> put $ s
               { stack = Map.insertWith appendOp s.pointer (Set 0)
+                  $ Map.unionWith appendOp s.stack
                   $ Map.fromFoldable
                   $ map
                       ( \(k /\ v) -> (k + s.pointer) /\ case v of
@@ -206,9 +207,11 @@ tLoop = do
                   addTranspile $ "if(" <> tMemory s.pointer <> "){"
                   addTranspile $ tMemory (s.pointer + i) <> "=" <> show v
                     <> ";"
-                  addTranspile "}else{"
-                  applyStackI (s.pointer + i)
                   addTranspile "}"
+                  when (Map.member (s.pointer + i) s.stack) $ do
+                    addTranspile "else{"
+                    applyStackI (s.pointer + i)
+                    addTranspile "}"
                 Add v -> do
                   applyStackI (s.pointer + i)
                   addTranspile $ case v of
