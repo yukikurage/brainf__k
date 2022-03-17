@@ -1,9 +1,9 @@
 name: Build and deploy website
 
 on:
-  push:
-    branches: [ master ]
   workflow_dispatch:
+    branches: [ master ]
+  push:
     branches: [ master ]
 
 jobs:
