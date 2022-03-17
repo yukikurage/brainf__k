@@ -183,7 +183,7 @@ tCode code = (_.transpiled) $ applyStack $ go
         Loop $ case internalLoop of
           --ループ最適化1
           { transpiled: "", pointer: 0, stacked }
-            | Map.lookup 0 stacked == Just (Add (-1))
+            | stacked == Map.singleton 0 (Add (-1))
                 && all isSet
                   (Map.delete 0 stacked) ->
                 state
@@ -198,10 +198,11 @@ tCode code = (_.transpiled) $ applyStack $ go
                               :: Array (Int /\ Operation)
                           )
                   }
-          -- ループ最適化2
+          --ループ最適化2
           { transpiled: "", pointer: 0, stacked }
-            | Map.lookup 0 stacked == Just (Add (-1)) &&
-                maybe false isSet (Map.lookup state.pointer state.stacked) ->
+            | Map.lookup 0 stacked == Just (Add (-1))
+                && maybe false isSet (Map.lookup state.pointer state.stacked)
+                && (Map.lookup state.pointer state.stacked) /= Just (Set 0) ->
                 let
                   v0' = Map.lookup state.pointer state.stacked
                   v0 = case v0' of
@@ -224,7 +225,6 @@ tCode code = (_.transpiled) $ applyStack $ go
                                 :: Array (Int /\ Operation)
                             )
                     }
-
           -- ループ最適化3
           { transpiled: "", pointer: 0, stacked }
             | Map.lookup 0 stacked == Just (Add (-1)) ->
