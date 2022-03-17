@@ -293,7 +293,7 @@ tCode code = (_.transpiled) $ applyStack $ go
                   <>
                     ");"
               }
-    Just '.' ->
+    Just ',' ->
       let
         prev = applyStack state
       in
