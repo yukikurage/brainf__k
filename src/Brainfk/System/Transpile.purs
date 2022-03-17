@@ -63,7 +63,7 @@ tPrelude { memorySize, cellSize } input =
     <> ");let i="
     <> show input
     <>
-      ";let x=0;"
+      ";let x=0;let f=postMessage;"
   where
   bit = case cellSize of
     Bit8 -> "8"
@@ -288,7 +288,7 @@ tCode code = (_.transpiled) $ applyStack $ go
       in
         Loop $ incr
           $ prev
-              { transpiled = prev.transpiled <> "postMessage("
+              { transpiled = prev.transpiled <> "f("
                   <> tMemory prev.pointer
                   <>
                     ");"
@@ -307,4 +307,4 @@ tCode code = (_.transpiled) $ applyStack $ go
 
 tReturn :: String
 tReturn =
-  "postMessage('f');"
+  "f('f');"
