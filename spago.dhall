@@ -31,6 +31,7 @@ to generate this file without the comments in this block.
   , "ordered-collections"
   , "prelude"
   , "record"
+  , "st"
   , "strings"
   , "tailrec"
   , "transformers"
