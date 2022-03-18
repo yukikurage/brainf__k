@@ -179,6 +179,7 @@ tLoop = do
       }
   case l of
     -- 最適化
+    _ | Map.lookup s.pointer s.stack == Just (Set 0) -> pure unit
     _
       | l.pointer == 0 && l.transpiled == "" && Map.lookup 0 l.stack == Just
           (Add (-1)) ->
@@ -264,6 +265,7 @@ tCodeState = flip tailRecM unit \unit -> do
       incrPos
       pure $ Loop unit
     Just ',' -> do
+      applyStackI s.pointer
       addTranspile $ "if(x<i.length){"
         <> tMemory s.pointer
         <> "=i.codePointAt(x);x=x+1;}"

@@ -6,14 +6,18 @@ import Brainfk.System.Exec (exec)
 import Brainfk.System.Transpile (CellSize(..), defaultSettings, transpile)
 import Brainfk.Web.Util (css, icon, modifyRecord, putRecord, wrap)
 import Control.Monad.Rec.Class (forever)
+import Data.Either (either)
 import Data.Int (floor)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (slice)
+import Data.String.Regex (regex, replace)
+import Data.String.Regex.Flags (global)
 import Data.Time (Time, diff)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Milliseconds(..), delay, message)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Exception (throw)
 import Effect.Now (nowTime)
 import Halogen (Component, RefLabel(..), liftAff, liftEffect)
 import Halogen.HTML (button, text, textarea)
@@ -66,7 +70,12 @@ component = Hooks.component \_ _ -> Hooks.do
       put execTimeId 0
 
       transpileBeforeTime <- liftEffect nowTime
-      let transpiled = transpile settings codeValue inputValue
+      reg <- either (throw >>> liftEffect) pure $ regex "\\r?\\n" global
+      let
+        transpiled = transpile settings codeValue $ replace
+          reg
+          "\n"
+          inputValue
       transpileAfterTime <- liftEffect nowTime
       put transpileTimeId $ diffS transpileAfterTime transpileBeforeTime
 
@@ -347,6 +356,8 @@ component = Hooks.component \_ _ -> Hooks.do
                     [ text "Mod" ]
                 , settingsItem "Memory Overflow"
                     [ text "Undefined" ]
+                , settingsItem "New line character"
+                    [ text "\\n" ]
                 ]
             ]
         ]
