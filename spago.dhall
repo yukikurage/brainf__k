@@ -20,6 +20,7 @@ to generate this file without the comments in this block.
   , "dom-indexed"
   , "effect"
   , "either"
+  , "exceptions"
   , "foldable-traversable"
   , "halogen"
   , "halogen-hooks"
