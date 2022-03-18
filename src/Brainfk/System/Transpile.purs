@@ -105,11 +105,11 @@ instance Show a => Show (Operation a) where
     Set n -> "Set " <> show n
 
 appendOp
-  :: forall a_
-   . Semiring a_
-  => Operation a_
-  -> Operation a_
-  -> Operation a_
+  :: forall a
+   . Semiring a
+  => Operation a
+  -> Operation a
+  -> Operation a
 appendOp _ (Set m) = Set m
 appendOp (Add n) (Add m) = Add $ n + m
 appendOp (Set n) (Add m) = Set $ n + m
