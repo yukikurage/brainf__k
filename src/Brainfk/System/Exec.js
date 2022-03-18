@@ -13,16 +13,6 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
 
   let output = "";
 
-  worker.addEventListener(
-    "message",
-    (e) => {
-      if (e.data !== "f") {
-        output += String.fromCodePoint(e.data);
-      }
-    },
-    false
-  );
-
   let terminateCallbackFunc = () => {}
   const terminateCallback = () => terminateCallbackFunc();
 
@@ -33,6 +23,21 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       return res;
     },
     waitFinish: new Promise((resolve) => {
+      worker.addEventListener(
+        "message",
+        (e) => {
+          if (e.data !== "f") {
+            try {
+              output += String.fromCodePoint(e.data);
+            } catch (e) {
+              resolve(just(e));
+              worker.terminate();
+              URL.revokeObjectURL(workerUrl);
+            }
+          }
+        },
+        false
+      );
       worker.addEventListener(
         "message",
         (e) => {
