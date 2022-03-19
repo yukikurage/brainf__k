@@ -9,9 +9,10 @@ module Brainfk.System.Transpile
 import Prelude
 
 import Control.Monad.Rec.Class (Step(..), tailRecM)
-import Control.Monad.State (State, execState, get, modify_, put)
+import Control.Monad.State (State, execState, get, gets, modify_, put)
 import Data.Foldable (fold)
 import Data.FoldableWithIndex (forWithIndex_)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -127,47 +128,47 @@ type TCodeState =
   , transpiled :: String
   }
 
-addTranspile :: String -> State TCodeState Unit
-addTranspile str = modify_ \s -> s { transpiled = s.transpiled <> str }
+writeDown :: String -> State TCodeState Unit
+writeDown str = modify_ \s -> s { transpiled = s.transpiled <> str }
 
-applyStackI :: Int -> State TCodeState Unit
-applyStackI i = do
-  { stack } <- get
-  case Map.lookup i stack of
+refStack :: Int -> State TCodeState (Maybe (Operation Int))
+refStack n = gets (\{ stack } -> Map.lookup n stack)
+
+deleteStack :: Int -> State TCodeState Unit
+deleteStack n = modify_ \s -> s { stack = Map.delete n (s.stack) }
+
+applyStack :: Int -> State TCodeState Unit
+applyStack i = do
+  r <- refStack i
+  case r of
     Nothing -> pure unit
     Just op -> do
-      addTranspile $ tOperation (tMemory i) op
-      modify_ \s -> s { stack = Map.delete i (s.stack) }
-
-applyStack :: (Int -> Operation Int -> Boolean) -> State TCodeState Unit
-applyStack f = do
-  { stack } <- get
-  modify_ \s -> s { stack = Map.filterWithKey (not f) stack }
-  addTranspile (fold $ Map.mapMaybeWithKey g $ stack)
-  where
-  g k v =
-    if f k v then
-      Just $ tOperation (tMemory k) v
-    else Nothing
+      writeDown $ tOperation (tMemory i) op
+      deleteStack i
 
 applyStackAll :: State TCodeState Unit
-applyStackAll = applyStack (const $ const true)
+applyStackAll = do
+  { stack } <- get
+  modify_ \s -> s { stack = Map.empty :: Map.Map Int (Operation Int) }
+  writeDown $ fold $ mapWithIndex g $ stack
+  where
+  g k v = tOperation (tMemory k) v
 
-incrPointer :: Int -> State TCodeState Unit
-incrPointer i = modify_ \s -> s { pointer = s.pointer + i }
+shiftPointer :: Int -> State TCodeState Unit
+shiftPointer i = modify_ \s -> s { pointer = s.pointer + i }
 
-incrPos :: State TCodeState Unit
-incrPos = modify_ \s -> s { position = s.position + 1 }
+incrementPos :: State TCodeState Unit
+incrementPos = modify_ \s -> s { position = s.position + 1 }
 
 resetPointer :: State TCodeState Unit
 resetPointer = do
   { pointer } <- get
   applyStackAll
-  addTranspile $ tCompute "p" pointer
+  writeDown $ tCompute "p" pointer
   modify_ \s -> s { pointer = 0 }
 
-tLoop :: State TCodeState Unit
-tLoop = do
+loop :: State TCodeState Unit
+loop = do
   s <- get
   let
     l = execState tCodeState
@@ -178,7 +179,7 @@ tLoop = do
       , transpiled: ""
       }
   case l of
-    -- 最適化
+    -- 最適化0
     _ | Map.lookup s.pointer s.stack == Just (Set 0) -> pure unit
     _
       | l.pointer == 0 && l.transpiled == "" && Map.lookup 0 l.stack == Just
@@ -202,20 +203,20 @@ tLoop = do
               }
             -- 最適化3
             _ -> do
-              applyStackI s.pointer
+              applyStack s.pointer
               forWithIndex_ (Map.delete 0 l.stack) \i -> case _ of
                 Set v -> do
-                  addTranspile $ "if(" <> tMemory s.pointer <> "){"
-                  addTranspile $ tMemory (s.pointer + i) <> "=" <> show v
+                  writeDown $ "if(" <> tMemory s.pointer <> "){"
+                  writeDown $ tMemory (s.pointer + i) <> "=" <> show v
                     <> ";"
-                  addTranspile "}"
+                  writeDown "}"
                   when (Map.member (s.pointer + i) s.stack) $ do
-                    addTranspile "else{"
-                    applyStackI (s.pointer + i)
-                    addTranspile "}"
+                    writeDown "else{"
+                    applyStack (s.pointer + i)
+                    writeDown "}"
                 Add v -> do
-                  applyStackI (s.pointer + i)
-                  addTranspile $ case v of
+                  applyStack (s.pointer + i)
+                  writeDown $ case v of
                     0 -> ""
                     1 -> tMemory (s.pointer + i) <> "+=" <> tMemory s.pointer <>
                       ";"
@@ -235,10 +236,10 @@ tLoop = do
     -- | 通常のループ
     _ -> do
       resetPointer
-      addTranspile "while(m[p]){"
+      writeDown "while(m[p]){"
       let loopState = execState resetPointer l
-      addTranspile loopState.transpiled
-      addTranspile "}"
+      writeDown loopState.transpiled
+      writeDown "}"
   modify_ $ _ { position = l.position }
   pure unit
 
@@ -248,30 +249,37 @@ tCodeState = flip tailRecM unit \unit -> do
   case charAt position code of
     Nothing -> pure (Done unit)
     Just ']' -> pure (Done unit)
-    Just '[' -> tLoop *> incrPos *> pure (Loop unit)
-    Just '>' -> incrPointer 1 *> incrPos *> pure (Loop unit)
-    Just '<' -> incrPointer (-1) *> incrPos *> pure (Loop unit)
+    Just '[' -> loop *> incrementPos *> pure (Loop unit)
+    Just '>' -> shiftPointer 1 *> incrementPos *> pure (Loop unit)
+    Just '<' -> shiftPointer (-1) *> incrementPos *> pure (Loop unit)
     Just '+' -> do
       put $ s { stack = Map.insertWith appendOp s.pointer (Add 1) s.stack }
-      incrPos
+      incrementPos
       pure $ Loop unit
     Just '-' -> do
       put $ s { stack = Map.insertWith appendOp s.pointer (Add (-1)) s.stack }
-      incrPos
+      incrementPos
       pure $ Loop unit
     Just '.' -> do
-      applyStackI s.pointer
-      addTranspile $ "f(" <> tMemory s.pointer <> ");"
-      incrPos
-      pure $ Loop unit
+      r <- refStack s.pointer
+      case r of
+        Just (Set m) -> do
+          writeDown $ "putchar(" <> show m <> ");"
+          incrementPos
+          pure $ Loop unit
+        _ -> do
+          applyStack s.pointer
+          writeDown $ "putChar(" <> tMemory s.pointer <> ");"
+          incrementPos
+          pure $ Loop unit
     Just ',' -> do
-      applyStackI s.pointer
-      addTranspile $ "if(x<i.length){"
+      applyStack s.pointer
+      writeDown $ "if(x<i.length){"
         <> tMemory s.pointer
         <> "=i.codePointAt(x);x=x+1;}"
-      incrPos
+      incrementPos
       pure $ Loop unit
-    Just _ -> incrPos *> pure (Loop unit)
+    Just _ -> incrementPos *> pure (Loop unit)
 
 tCode :: String -> String
 tCode code = (_.transpiled) $ execState tCodeState
