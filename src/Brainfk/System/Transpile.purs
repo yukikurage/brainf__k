@@ -1,8 +1,10 @@
 module Brainfk.System.Transpile
   ( CellSize(..)
+  , Operation(..)
   , Settings
   , Transpiled(..)
   , defaultSettings
+  , tOperation
   , transpile
   ) where
 
@@ -10,6 +12,7 @@ import Prelude
 
 import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Control.Monad.State (State, execState, get, gets, modify_, put)
+import Data.Array (replicate)
 import Data.Foldable (fold)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -45,10 +48,11 @@ defaultSettings =
   , cellSize: Bit8
   }
 
-transpile :: forall r. Record (Settings r) -> String -> String -> Transpiled
+transpile
+  :: forall r. Record (Settings r) -> String -> String -> Transpiled
 transpile settings code input = Transpiled $
   tPrelude settings input
-    <> tCode code
+    <> tCode settings code
     <> tReturn
 
 {-
@@ -95,15 +99,15 @@ tMemory n =
     <> "]"
 
 -- | 値に対する操作を一般化
-data Operation a = Add a | Set a
+data Operation a = OperationAdd a | OperationSet a
 
 derive instance Eq a => Eq (Operation a)
 derive instance Ord a => Ord (Operation a)
 
 instance Show a => Show (Operation a) where
   show = case _ of
-    Add n -> "Add " <> show n
-    Set n -> "Set " <> show n
+    OperationAdd n -> "OperationAdd " <> show n
+    OperationSet n -> "OperationSet " <> show n
 
 appendOp
   :: forall a
@@ -111,20 +115,21 @@ appendOp
   => Operation a
   -> Operation a
   -> Operation a
-appendOp _ (Set m) = Set m
-appendOp (Add n) (Add m) = Add $ n + m
-appendOp (Set n) (Add m) = Set $ n + m
+appendOp _ (OperationSet m) = OperationSet m
+appendOp (OperationAdd n) (OperationAdd m) = OperationAdd $ n + m
+appendOp (OperationSet n) (OperationAdd m) = OperationSet $ n + m
 
 tOperation :: String -> Operation Int -> String
 tOperation left = case _ of
-  Add n -> tCompute left n
-  Set x -> left <> "=" <> show x <> ";"
+  OperationAdd n -> tCompute left n
+  OperationSet x -> left <> "=" <> show x <> ";"
 
 type TCodeState =
   { code :: String
   , pointer :: Int
   , position :: Int
-  , stack :: Map Int (Operation Int)
+  , stack :: Map Int (Operation Int) -- Left: Operated, Right: Operation
+  , operated :: Map Int Int
   , transpiled :: String
   }
 
@@ -133,6 +138,15 @@ writeDown str = modify_ \s -> s { transpiled = s.transpiled <> str }
 
 refStack :: Int -> State TCodeState (Maybe (Operation Int))
 refStack n = gets (\{ stack } -> Map.lookup n stack)
+
+knownValue :: Int -> State TCodeState (Maybe Int)
+knownValue n = do
+  r <- refStack n
+  case r of
+    Just (OperationSet m) -> pure $ Just m
+    Just (OperationAdd x) -> map (_ + x) <$> gets
+      (\{ operated } -> Map.lookup n operated)
+    _ -> gets (\{ operated } -> Map.lookup n operated)
 
 deleteStack :: Int -> State TCodeState Unit
 deleteStack n = modify_ \s -> s { stack = Map.delete n (s.stack) }
@@ -145,6 +159,11 @@ applyStack i = do
     Just op -> do
       writeDown $ tOperation (tMemory i) op
       deleteStack i
+      case op of
+        OperationAdd x -> modify_ \s -> s
+          { operated = Map.update (\v -> Just $ x + v) i s.operated }
+        OperationSet x -> modify_ \s -> s
+          { operated = Map.insert i x s.operated }
 
 applyStackAll :: State TCodeState Unit
 applyStackAll = do
@@ -160,8 +179,8 @@ shiftPointer i = modify_ \s -> s { pointer = s.pointer + i }
 incrementPos :: State TCodeState Unit
 incrementPos = modify_ \s -> s { position = s.position + 1 }
 
-resetPointer :: State TCodeState Unit
-resetPointer = do
+reOperationSetPointer :: State TCodeState Unit
+reOperationSetPointer = do
   { pointer } <- get
   applyStackAll
   writeDown $ tCompute "p" pointer
@@ -177,24 +196,26 @@ loop = do
       , position: s.position + 1
       , stack: Map.empty
       , transpiled: ""
+      , operated: Map.empty
       }
+  kv <- knownValue s.pointer
   case l of
     -- 最適化0
-    _ | Map.lookup s.pointer s.stack == Just (Set 0) -> pure unit
+    _ | kv == Just 0 -> pure unit
     _
       | l.pointer == 0 && l.transpiled == "" && Map.lookup 0 l.stack == Just
-          (Add (-1)) ->
-          case Map.lookup s.pointer s.stack of
+          (OperationAdd (-1)) ->
+          case kv of
             -- 最適化1
-            Just (Set 0) -> pure unit
+            Just 0 -> pure unit
             -- 最適化2
-            Just (Set m) -> put $ s
-              { stack = Map.insertWith appendOp s.pointer (Set 0)
+            Just m -> put $ s
+              { stack = Map.insertWith appendOp s.pointer (OperationSet 0)
                   $ Map.unionWith appendOp s.stack
                   $ Map.fromFoldable
                   $ map
                       ( \(k /\ v) -> (k + s.pointer) /\ case v of
-                          Add v' -> Add $ v' * m
+                          OperationAdd v' -> OperationAdd $ v' * m
                           _ -> v
                       )
                       ( Map.toUnfoldable l.stack
@@ -204,42 +225,50 @@ loop = do
             -- 最適化3
             _ -> do
               applyStack s.pointer
-              forWithIndex_ (Map.delete 0 l.stack) \i -> case _ of
-                Set v -> do
-                  writeDown $ "if(" <> tMemory s.pointer <> "){"
-                  writeDown $ tMemory (s.pointer + i) <> "=" <> show v
-                    <> ";"
-                  writeDown "}"
-                  when (Map.member (s.pointer + i) s.stack) $ do
-                    writeDown "else{"
-                    applyStack (s.pointer + i)
+              forWithIndex_ (Map.delete 0 l.stack) \i op -> do
+                case op of
+                  OperationSet v -> do
+                    writeDown $ "if(" <> tMemory s.pointer <> "){"
+                    writeDown $ tMemory (s.pointer + i) <> "=" <> show v
+                      <> ";"
                     writeDown "}"
-                Add v -> do
-                  applyStack (s.pointer + i)
-                  writeDown $ case v of
-                    0 -> ""
-                    1 -> tMemory (s.pointer + i) <> "+=" <> tMemory s.pointer <>
-                      ";"
-                    (-1) -> tMemory (s.pointer + i) <> "-=" <> tMemory s.pointer
-                      <> ";"
-                    _ | v > 0 -> tMemory (s.pointer + i) <> "+=" <> show v
-                      <> "*"
-                      <> tMemory s.pointer
-                      <> ";"
-                    _ | otherwise -> tMemory (s.pointer + i) <> "-="
-                      <> show (abs v)
-                      <> "*"
-                      <> tMemory s.pointer
-                      <> ";"
+                    when (Map.member (s.pointer + i) s.stack) $ do
+                      writeDown "else{"
+                      applyStack (s.pointer + i)
+                      writeDown "}"
+                  OperationAdd v -> do
+                    applyStack (s.pointer + i)
+                    writeDown $ case v of
+                      0 -> ""
+                      1 -> tMemory (s.pointer + i) <> "+=" <> tMemory s.pointer
+                        <>
+                          ";"
+                      (-1) -> tMemory (s.pointer + i) <> "-="
+                        <> tMemory s.pointer
+                        <> ";"
+                      _ | v > 0 -> tMemory (s.pointer + i) <> "+=" <> show v
+                        <> "*"
+                        <> tMemory s.pointer
+                        <> ";"
+                      _ | otherwise -> tMemory (s.pointer + i) <> "-="
+                        <> show (abs v)
+                        <> "*"
+                        <> tMemory s.pointer
+                        <> ";"
+                modify_ $ \s' -> s'
+                  { operated = Map.delete (s.pointer + i) s'.operated }
               modify_ \s' -> s'
-                { stack = Map.insertWith appendOp s.pointer (Set 0) s'.stack }
+                { stack = Map.insertWith appendOp s.pointer (OperationSet 0)
+                    s'.stack
+                }
     -- | 通常のループ
     _ -> do
-      resetPointer
+      reOperationSetPointer
       writeDown "while(m[p]){"
-      let loopState = execState resetPointer l
+      let loopState = execState reOperationSetPointer l
       writeDown loopState.transpiled
       writeDown "}"
+      modify_ $ _ { operated = Map.empty :: Map Int Int }
   modify_ $ _ { position = l.position }
   pure unit
 
@@ -253,23 +282,26 @@ tCodeState = flip tailRecM unit \unit -> do
     Just '>' -> shiftPointer 1 *> incrementPos *> pure (Loop unit)
     Just '<' -> shiftPointer (-1) *> incrementPos *> pure (Loop unit)
     Just '+' -> do
-      put $ s { stack = Map.insertWith appendOp s.pointer (Add 1) s.stack }
+      put $ s
+        { stack = Map.insertWith appendOp s.pointer (OperationAdd 1) s.stack }
       incrementPos
       pure $ Loop unit
     Just '-' -> do
-      put $ s { stack = Map.insertWith appendOp s.pointer (Add (-1)) s.stack }
+      put $ s
+        { stack = Map.insertWith appendOp s.pointer (OperationAdd (-1)) s.stack
+        }
       incrementPos
       pure $ Loop unit
     Just '.' -> do
-      r <- refStack s.pointer
+      r <- knownValue s.pointer
       case r of
-        Just (Set m) -> do
-          writeDown $ "putchar(" <> show m <> ");"
+        Just m -> do
+          writeDown $ "f(" <> show m <> ");"
           incrementPos
           pure $ Loop unit
         _ -> do
           applyStack s.pointer
-          writeDown $ "putChar(" <> tMemory s.pointer <> ");"
+          writeDown $ "f(" <> tMemory s.pointer <> ");"
           incrementPos
           pure $ Loop unit
     Just ',' -> do
@@ -281,13 +313,14 @@ tCodeState = flip tailRecM unit \unit -> do
       pure $ Loop unit
     Just _ -> incrementPos *> pure (Loop unit)
 
-tCode :: String -> String
-tCode code = (_.transpiled) $ execState tCodeState
+tCode :: forall r. Record (Settings r) -> String -> String
+tCode { memorySize } code = (_.transpiled) $ execState tCodeState
   { code
   , pointer: 0
   , position: 0
   , stack: Map.empty
   , transpiled: ""
+  , operated: Map.fromFoldableWithIndex $ replicate memorySize 0
   }
 
 tReturn :: String
