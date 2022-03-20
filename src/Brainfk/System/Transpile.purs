@@ -16,12 +16,12 @@ import Data.Array (replicate)
 import Data.Foldable (fold)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Map (Map)
-import Data.Map as Map
+import Data.HashMap (HashMap)
+import Data.HashMap as Map
 import Data.Maybe (Maybe(..))
 import Data.Ord (abs)
 import Data.String.CodeUnits (charAt)
-import Data.Tuple.Nested (type (/\), (/\))
+import Data.Tuple.Nested ((/\))
 
 newtype Transpiled = Transpiled String
 
@@ -128,8 +128,8 @@ type TCodeState =
   { code :: String
   , pointer :: Int
   , position :: Int
-  , stack :: Map Int (Operation Int) -- Left: Operated, Right: Operation
-  , operated :: Map Int Int
+  , stack :: HashMap Int (Operation Int) -- Left: Operated, Right: Operation
+  , operated :: HashMap Int Int
   , transpiled :: String
   }
 
@@ -168,7 +168,7 @@ applyStack i = do
 applyStackAll :: State TCodeState Unit
 applyStackAll = do
   { stack } <- get
-  modify_ \s -> s { stack = Map.empty :: Map.Map Int (Operation Int) }
+  modify_ \s -> s { stack = Map.empty :: HashMap Int (Operation Int) }
   writeDown $ fold $ mapWithIndex g $ stack
   where
   g k v = tOperation (tMemory k) v
@@ -212,15 +212,13 @@ loop = do
             Just m -> put $ s
               { stack = Map.insertWith appendOp s.pointer (OperationSet 0)
                   $ Map.unionWith appendOp s.stack
-                  $ Map.fromFoldable
-                  $ map
-                      ( \(k /\ v) -> (k + s.pointer) /\ case v of
+                  $ Map.fromArray
+                  $ Map.toArrayBy
+                      ( \k v -> (k + s.pointer) /\ case v of
                           OperationAdd v' -> OperationAdd $ v' * m
                           _ -> v
                       )
-                      ( Map.toUnfoldable l.stack
-                          :: Array (Int /\ Operation Int)
-                      )
+                  $ l.stack
               }
             -- 最適化3
             _ -> do
@@ -268,7 +266,7 @@ loop = do
       let loopState = execState reOperationSetPointer l
       writeDown loopState.transpiled
       writeDown "}"
-      modify_ $ _ { operated = Map.empty :: Map Int Int }
+      modify_ $ _ { operated = Map.empty :: HashMap Int Int }
   modify_ $ _ { position = l.position }
   pure unit
 
