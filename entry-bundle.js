@@ -1,3 +1,3 @@
-const Main = require("./dist/spago-bundle.js")
+const Main = require("./.dist/spago-bundle.js")
 
 Main.main()
