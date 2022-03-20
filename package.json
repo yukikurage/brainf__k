@@ -6,7 +6,7 @@
   "scripts": {
     "test:spago": "npx spago test",
     "test": "run-s test:*",
-    "bundle:spago": "npx spago build --purs-args",
+    "bundle:spago": "npx spago build",
     "bundle:esbuild": "npx esbuild entry.js --bundle --outfile=./public/index.js --minify",
     "bundle:tailwind": "npx tailwindcss -i ./tailwind.css -o ./public/style.css",
     "bundle": "run-s bundle:spago bundle:esbuild bundle:tailwind",
