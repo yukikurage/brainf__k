@@ -5,15 +5,13 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
 
   console.log(workerContent);
 
-  const workerUrl = URL.createObjectURL(
-    new Blob([workerContent])
-  );
+  const workerUrl = URL.createObjectURL(new Blob([workerContent]));
 
   const worker = new Worker(workerUrl);
 
   let output = "";
 
-  let terminateCallbackFunc = () => {}
+  let terminateCallbackFunc = () => {};
   const terminateCallback = () => terminateCallbackFunc();
 
   const res = {
@@ -26,7 +24,11 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       worker.addEventListener(
         "message",
         (e) => {
-          if (e.data !== "f") {
+          if (e.data === "f") {
+            worker.terminate();
+            URL.revokeObjectURL(workerUrl);
+            resolve(nothing);
+          } else {
             try {
               output += String.fromCodePoint(e.data);
             } catch (e) {
@@ -34,17 +36,6 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
               worker.terminate();
               URL.revokeObjectURL(workerUrl);
             }
-          }
-        },
-        false
-      );
-      worker.addEventListener(
-        "message",
-        (e) => {
-          if (e.data === "f") {
-            worker.terminate();
-            URL.revokeObjectURL(workerUrl);
-            resolve(nothing);
           }
         },
         false
@@ -61,15 +52,14 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       terminateCallbackFunc = () => {
         worker.terminate();
         URL.revokeObjectURL(workerUrl);
-        resolve(just(new Error('Process terminated')));
-      }
+        resolve(just(new Error("Process terminated")));
+      };
     }),
     stop: () => {
       terminateCallback();
     },
-  }
+  };
 
-
-  worker.postMessage('');
+  worker.postMessage("");
   return res;
 };
