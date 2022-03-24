@@ -1,7 +1,7 @@
 "use strict";
 
 exports.exec_ = (just) => (nothing) => (func) => () => {
-  const workerContent = `self.addEventListener('message',()=>{${func}},false);`;
+  const workerContent = func;
 
   console.log(workerContent);
 

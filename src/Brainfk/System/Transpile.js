@@ -244,8 +244,8 @@ exports.transpile_ =
       return { pointer, transpiled, stack };
     };
 
-    return `let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=[${input.split("").map((v) => v.codePointAt(0))}];let x=0;let f=postMessage;${
+    return `self.addEventListener('message',()=>{let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=[${input.split("").map((v) => v.codePointAt(0))}];let x=0;let f=postMessage;${
       go(new Map(new Array(memorySize).fill(0).map((_, i) => [i, 0])))
         .transpiled
-    }f('f');`;
+    }f('f');},false);`;
   };
