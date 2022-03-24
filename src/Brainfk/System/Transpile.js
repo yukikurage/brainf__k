@@ -52,7 +52,7 @@ exports.transpile_ =
           transpiled += `${memory(n)}=${res.value};`;
         }
         stack.delete(n);
-        if(operated.get(n)){operated.set(n, (res.type === "Add" ? res.value + operated.get(n) : res.value));}
+        if(operated.get(n) !== undefined){operated.set(n, (res.type === "Add" ? res.value + operated.get(n) : res.value));}
       };
 
       const useAll = () => {
@@ -75,6 +75,9 @@ exports.transpile_ =
         }
         if (res === undefined && operated.get(n) !== undefined) {
           return operated.get(n);
+        }
+        if (res !== undefined && res.type === "Add" && operated.get(n) !== undefined) {
+          return res.value + operated.get(n);
         }
         return undefined;
       };
