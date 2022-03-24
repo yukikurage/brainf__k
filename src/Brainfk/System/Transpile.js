@@ -36,7 +36,7 @@ exports.transpile_ =
   (code) =>
   (input) => {
     let position = 0;
-    const go = () => {
+    const go = (operated) => {
       let pointer = 0;
       let transpiled = "";
       let stack = new Map();
@@ -52,6 +52,7 @@ exports.transpile_ =
           transpiled += `${memory(n)}=${res.value};`;
         }
         stack.delete(n);
+        if(operated.get(n)){operated.set(n, (res.type === "Add" ? res.value + operated.get(n) : res.value));}
       };
 
       const useAll = () => {
@@ -64,12 +65,16 @@ exports.transpile_ =
           }
         }
         stack.clear();
+        operated = new Map();
       };
 
       const knownValue = (n) => {
         const res = stack.get(n);
         if (res !== undefined && res.type === "Set") {
           return res.value;
+        }
+        if (res === undefined && operated.get(n) !== undefined) {
+          return operated.get(n);
         }
         return undefined;
       };
@@ -118,7 +123,7 @@ exports.transpile_ =
         }
         if (command === "[") {
           position++;
-          const loop = go();
+          const loop = go(new Map());
           const res = knownValue(pointer);
           if (res === 0) {
             // do nothing
@@ -161,6 +166,7 @@ exports.transpile_ =
                       pointer
                     )};`;
                   }
+                  operated.set(pointer + n, undefined);
                 }
                 addStack(pointer, "Set", 0);
               }
@@ -190,6 +196,6 @@ exports.transpile_ =
     };
 
     return `let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=${input};let x=0;let f=postMessage;${
-      go().transpiled
+      go(new Map(new Array(memorySize).fill(0).map((_, i) => [i, 0]))).transpiled
     }f('f');`;
   };
