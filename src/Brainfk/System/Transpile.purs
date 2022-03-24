@@ -54,4 +54,4 @@ transpile settings code input = Transpiled $ transpile_
   , cellSize: cellSizeToString settings.cellSize
   }
   code
-  (show input)
+  input
