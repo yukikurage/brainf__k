@@ -180,16 +180,17 @@ exports.transpile_ =
                 // 最適化 2
                 use(pointer);
                 loop.stack.delete(0);
+                transpiled += `t=${memory(pointer)};`;
                 for (const entry of loop.stack.entries()) {
                   const [n, v] = entry;
                   if (v.type === "Set") {
-                    transpiled += `if(${memory(pointer)}){${memory(
+                    transpiled += `if(t){${memory(
                       pointer + n
                     )}=${v.value};}`;
                     transpiled += "else{";
                     use(pointer + n);
                     transpiled += "}";
-                  } else {
+                  } else { //Add
                     use(pointer + n);
                     transpiled += memory(pointer + n);
                     (() => {
@@ -197,19 +198,19 @@ exports.transpile_ =
                         return;
                       }
                       if (v.value === 1) {
-                        transpiled += `+=${memory(pointer)};`;
+                        transpiled += `+=t;`;
                         return;
                       }
                       if (v.value >= 2) {
-                        transpiled += `+=${v.value}*${memory(pointer)};`;
+                        transpiled += `+=${v.value}*t;`;
                         return;
                       }
                       if (v.value === -1) {
-                        transpiled += `-=${memory(pointer)};`;
+                        transpiled += `-=t;`;
                         return;
                       }
                       if (v.value <= -2) {
-                        transpiled += `-=${-v.value}*${memory(pointer)};`;
+                        transpiled += `-=${-v.value}*t;`;
                         return;
                       }
                     })();
@@ -244,7 +245,7 @@ exports.transpile_ =
       return { pointer, transpiled, stack };
     };
 
-    return `self.addEventListener('message',()=>{let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=[${input.split("").map((v) => v.codePointAt(0))}];let x=0;let f=postMessage;${
+    return `self.addEventListener('message',()=>{let t=0;let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=[${input.split("").map((v) => v.codePointAt(0))}];let x=0;let f=postMessage;${
       go(new Map(new Array(memorySize).fill(0).map((_, i) => [i, 0])))
         .transpiled
     }f('f');},false);`;
