@@ -27,6 +27,24 @@ const memory = (n) => {
   }
 };
 
+const addOperation = (left, right) => {
+  if (right == 0) {
+    return "";
+  }
+  if (right == 1) {
+    return `${left}++;`;
+  }
+  if (right == -1) {
+    return `${left}--;`;
+  }
+  if (right > 0) {
+    return `${left}+=${right};`;
+  }
+  if (right < 0) {
+    return `${left}-=${-right};`;
+  }
+};
+
 /**
  * memorySize: number
  * cellSize: '8' | '16' | '32'
@@ -47,19 +65,24 @@ exports.transpile_ =
           return;
         }
         if (res.type === "Add") {
-          transpiled += `${memory(n)}+=${res.value};`;
+          transpiled += addOperation(memory(n), res.value);
         } else {
           transpiled += `${memory(n)}=${res.value};`;
         }
         stack.delete(n);
-        if(operated.get(n) !== undefined){operated.set(n, (res.type === "Add" ? res.value + operated.get(n) : res.value));}
+        if (operated.get(n) !== undefined) {
+          operated.set(
+            n,
+            res.type === "Add" ? res.value + operated.get(n) : res.value
+          );
+        }
       };
 
       const useAll = () => {
         for (const entry of stack.entries()) {
           const [n, v] = entry;
           if (v.type === "Add") {
-            transpiled += `${memory(n)}+=${v.value};`;
+            transpiled += addOperation(memory(n), v.value);
           } else {
             transpiled += `${memory(n)}=${v.value};`;
           }
@@ -76,7 +99,11 @@ exports.transpile_ =
         if (res === undefined && operated.get(n) !== undefined) {
           return operated.get(n);
         }
-        if (res !== undefined && res.type === "Add" && operated.get(n) !== undefined) {
+        if (
+          res !== undefined &&
+          res.type === "Add" &&
+          operated.get(n) !== undefined
+        ) {
           return res.value + operated.get(n);
         }
         return undefined;
@@ -134,7 +161,6 @@ exports.transpile_ =
             if (
               loop.pointer === 0 &&
               loop.transpiled === "" &&
-              loop.stack.get(0) &&
               loop.stack.get(0).type === "Add" &&
               loop.stack.get(0) &&
               loop.stack.get(0).value === -1
@@ -165,9 +191,28 @@ exports.transpile_ =
                     transpiled += "}";
                   } else {
                     use(pointer + n);
-                    transpiled += `${memory(pointer + n)}+=${v.value}*${memory(
-                      pointer
-                    )};`;
+                    transpiled += memory(pointer + n);
+                    (() => {
+                      if (v.value === 0) {
+                        return;
+                      }
+                      if (v.value === 1) {
+                        transpiled += `+=${memory(pointer)};`;
+                        return;
+                      }
+                      if (v.value >= 2) {
+                        transpiled += `+=${v.value}*${memory(pointer)};`;
+                        return;
+                      }
+                      if (v.value === -1) {
+                        transpiled += `-=${memory(pointer)};`;
+                        return;
+                      }
+                      if (v.value <= -2) {
+                        transpiled += `-=${-v.value}*${memory(pointer)};`;
+                        return;
+                      }
+                    })();
                   }
                   operated.set(pointer + n, undefined);
                 }
@@ -176,19 +221,20 @@ exports.transpile_ =
             } else {
               // 最適化なし
               useAll();
-              transpiled += `p+=${pointer};`;
+              transpiled += addOperation("p", pointer);
               pointer = 0;
               stack.clear();
               transpiled += `while(m[p]){${loop.transpiled}`;
               for (const entry of loop.stack.entries()) {
                 const [n, v] = entry;
                 if (v.type === "Add") {
-                  transpiled += `${memory(n)}+=${v.value};`;
+                  transpiled += addOperation(memory(n), v.value);
                 } else {
                   transpiled += `${memory(n)}=${v.value};`;
                 }
               }
-              transpiled += `p+=${loop.pointer};}`;
+              transpiled += addOperation("p", loop.pointer);
+              transpiled += "}";
             }
           }
         }
@@ -199,6 +245,7 @@ exports.transpile_ =
     };
 
     return `let p=0;let m=new Uint${cellSize}Array(${memorySize});let i=${input};let x=0;let f=postMessage;${
-      go(new Map(new Array(memorySize).fill(0).map((_, i) => [i, 0]))).transpiled
+      go(new Map(new Array(memorySize).fill(0).map((_, i) => [i, 0])))
+        .transpiled
     }f('f');`;
   };
