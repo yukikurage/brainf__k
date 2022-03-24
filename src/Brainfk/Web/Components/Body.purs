@@ -91,7 +91,7 @@ component = Hooks.component \_ _ -> Hooks.do
 
         autoScroll
 
-        liftAff $ delay $ Milliseconds $ 100.0
+        liftAff $ delay $ Milliseconds $ 60.0
 
       _ <- fork do
         runtimeErrorMaybe <- liftAff waitFinish
