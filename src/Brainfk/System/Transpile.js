@@ -161,8 +161,8 @@ exports.transpile_ =
             if (
               loop.pointer === 0 &&
               loop.transpiled === "" &&
-              loop.stack.get(0).type === "Add" &&
               loop.stack.get(0) &&
+              loop.stack.get(0).type === "Add" &&
               loop.stack.get(0).value === -1
             ) {
               // 最適化 1
