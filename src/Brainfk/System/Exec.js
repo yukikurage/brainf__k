@@ -1,18 +1,34 @@
 "use strict";
 
-exports.exec_ = (just) => (nothing) => (func) => () => {
-  const workerContent = func;
-
-  console.log(workerContent);
-
-  const workerUrl = URL.createObjectURL(new Blob([workerContent]));
-
-  const worker = new Worker(workerUrl);
-
+exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
   let output = "";
 
-  let terminateCallbackFunc = () => {};
-  const terminateCallback = () => terminateCallbackFunc();
+  let i = 0;
+
+  const instance = new WebAssembly.Instance(compiled, {
+    env: {
+      memory: new WebAssembly.Memory({
+        initial: 2,
+      }),
+      output: (value) => {
+        output += String.fromCodePoint(value);
+      },
+      input: () => {
+        return input.codePointAt(i++);
+      },
+    },
+  });
+
+  // const workerContent = func;
+
+  // console.log(workerContent);
+
+  // const workerUrl = URL.createObjectURL(new Blob([workerContent]));
+
+  // const worker = new Worker(workerUrl);
+
+  // let terminateCallbackFunc = () => {};
+  // const terminateCallback = () => terminateCallbackFunc();
 
   const res = {
     getOutput: () => {
@@ -21,45 +37,48 @@ exports.exec_ = (just) => (nothing) => (func) => () => {
       return res;
     },
     waitFinish: new Promise((resolve) => {
-      worker.addEventListener(
-        "message",
-        (e) => {
-          if (e.data === "f") {
-            worker.terminate();
-            URL.revokeObjectURL(workerUrl);
-            resolve(nothing);
-          } else {
-            try {
-              output += String.fromCodePoint(e.data);
-            } catch (e) {
-              resolve(just(e));
-              worker.terminate();
-              URL.revokeObjectURL(workerUrl);
-            }
-          }
-        },
-        false
-      );
-      worker.addEventListener(
-        "error",
-        (e) => {
-          resolve(just(e));
-          worker.terminate();
-          URL.revokeObjectURL(workerUrl);
-        },
-        false
-      );
-      terminateCallbackFunc = () => {
-        worker.terminate();
-        URL.revokeObjectURL(workerUrl);
-        resolve(just(new Error("Process terminated")));
-      };
+      // worker.addEventListener(
+      //   "message",
+      //   (e) => {
+      //     if (e.data === "f") {
+      //       worker.terminate();
+      //       URL.revokeObjectURL(workerUrl);
+      //       resolve(nothing);
+      //     } else {
+      //       try {
+      //         output += String.fromCodePoint(e.data);
+      //       } catch (e) {
+      //         resolve(just(e));
+      //         worker.terminate();
+      //         URL.revokeObjectURL(workerUrl);
+      //       }
+      //     }
+      //   },
+      //   false
+      // );
+      // worker.addEventListener(
+      //   "error",
+      //   (e) => {
+      //     resolve(just(e));
+      //     worker.terminate();
+      //     URL.revokeObjectURL(workerUrl);
+      //   },
+      //   false
+      // );
+      // terminateCallbackFunc = () => {
+      //   worker.terminate();
+      //   URL.revokeObjectURL(workerUrl);
+      //   resolve(just(new Error("Process terminated")));
+      // };
+      resolve(nothing);
     }),
     stop: () => {
-      terminateCallback();
+      // terminateCallback();
     },
   };
 
-  worker.postMessage("");
+  instance.exports.main();
+
+  // worker.postMessage("");
   return res;
 };

@@ -8,15 +8,11 @@ module Brainfk.System.Transpile
 
 import Prelude
 
+import Control.Promise (Promise, toAff)
 import Data.Int (toNumber)
+import Effect.Aff (Aff)
 
-newtype Transpiled = Transpiled String
-
-derive newtype instance Eq Transpiled
-derive newtype instance Ord Transpiled
-derive newtype instance Show Transpiled
-derive newtype instance Semigroup Transpiled
-derive newtype instance Monoid Transpiled
+foreign import data Transpiled :: Type
 
 data CellSize = Bit8 | Bit16 | Bit32
 
@@ -44,14 +40,12 @@ foreign import transpile_
   :: forall r
    . { memorySize :: Number, cellSize :: String | r }
   -> String
-  -> String
-  -> String
+  -> Promise Transpiled
 
 transpile
-  :: forall r. Record (Settings r) -> String -> String -> Transpiled
-transpile settings code input = Transpiled $ transpile_
+  :: forall r. Record (Settings r) -> String -> Aff Transpiled
+transpile settings code = toAff $ transpile_
   { memorySize: toNumber settings.memorySize
   , cellSize: cellSizeToString settings.cellSize
   }
   code
-  input

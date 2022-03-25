@@ -44,11 +44,14 @@ component
 component = Hooks.component \_ _ -> Hooks.do
   codeValue /\ codeValueId <- useState ""
   inputValue /\ inputValueId <- useState ""
-  outputText /\ outputTextId <- useState ""
+  outputValue /\ outputValueId <- useState ""
+
   stopEffect /\ stopEffectId <- useState $ pure unit
   isRunning /\ isRunningId <- useState false
+
   isSettingsModalOpen /\ isSettingsModalOpenId <- useState false
   settings /\ settingsId <- useState defaultSettings
+
   transpileTime /\ transpileTimeId <- useState 0
   execTime /\ execTimeId <- useState 0
 
@@ -64,27 +67,26 @@ component = Hooks.component \_ _ -> Hooks.do
 
     runBrainfk = do
       stopEffect
-      put outputTextId ""
+      put outputValueId ""
       put isRunningId true
       put transpileTimeId 0
       put execTimeId 0
 
       transpileBeforeTime <- liftEffect nowTime
-      reg <- either (throw >>> liftEffect) pure $ regex "\\r?\\n" global
-      let
-        transpiled = transpile settings codeValue $ replace
-          reg
-          "\n"
-          inputValue
+      transpiled <- liftAff $ transpile settings codeValue
       transpileAfterTime <- liftEffect nowTime
       put transpileTimeId $ diffS transpileAfterTime transpileBeforeTime
 
       execBeforeTime <- liftEffect nowTime
-      { getOutput, stop, waitFinish } <- liftEffect $ exec transpiled
+
+      reg <- either (throw >>> liftEffect) pure $ regex "\\r?\\n" global
+      let
+        input = replace reg "\n" inputValue
+      { getOutput, stop, waitFinish } <- liftEffect $ exec input transpiled
 
       updateForkId <- fork $ forever do
         output <- liftEffect getOutput
-        modify_ outputTextId
+        modify_ outputValueId
           ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
               (prev <> output)
           )
@@ -98,7 +100,7 @@ component = Hooks.component \_ _ -> Hooks.do
 
         kill updateForkId
         output <- liftEffect getOutput
-        modify_ outputTextId
+        modify_ outputValueId
           ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
               (prev <> output)
           )
@@ -109,7 +111,7 @@ component = Hooks.component \_ _ -> Hooks.do
         put execTimeId $ execAfterTime `diffS` execBeforeTime
         case runtimeErrorMaybe of
           Just runtimeError -> do
-            modify_ outputTextId
+            modify_ outputValueId
               (\prev -> prev <> "\nError: " <> message runtimeError)
           Nothing -> pure unit
 
@@ -235,7 +237,7 @@ component = Hooks.component \_ _ -> Hooks.do
                 , HH.div [ css "text-xl p-1" ] [ text "Output" ]
                 , HH.div [ css "w-full flex-[7] p-1" ]
                     [ textarea
-                        [ value $ outputText
+                        [ value $ outputValue
                         , readOnly true
                         , wrap "off"
                         , css
