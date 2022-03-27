@@ -7,14 +7,15 @@ exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
 
   const instance = new WebAssembly.Instance(compiled, {
     env: {
-      memory: new WebAssembly.Memory({
-        initial: 2,
-      }),
+      log: (value) => {
+        console.log(value);
+      },
       output: (value) => {
         output += String.fromCodePoint(value);
       },
-      input: () => {
-        return input.codePointAt(i++);
+      input: (value) => {
+        if (i < input.length) return input.codePointAt(i++);
+        return value;
       },
     },
   });
