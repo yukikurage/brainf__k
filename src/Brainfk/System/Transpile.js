@@ -16,69 +16,62 @@ const append = (op1, op2) => {
     return { type: "Set", value: op2.value };
   }
 };
-
-const memory = (n) => {
-  if (n === 0) {
-    return "m[p]";
-  }
-  if (n > 0) {
-    return `m[p+${n}]`;
-  }
-  if (n < 0) {
-    return `m[p-${-n}]`;
-  }
-};
-
-const addOperation = (left, right) => {
-  if (right == 0) {
-    return "";
-  }
-  if (right == 1) {
-    return `${left}++;`;
-  }
-  if (right == -1) {
-    return `${left}--;`;
-  }
-  if (right > 0) {
-    return `${left}+=${right};`;
-  }
-  if (right < 0) {
-    return `${left}-=${-right};`;
-  }
-};
-
 /**
  * memorySize: number
- * cellSize: '8' | '16' | '32'
+ * cellSize: 0 | 1 | 2
  */
 exports.transpile_ =
   ({ memorySize, cellSize }) =>
   (code) =>
     binaryenPromise.then(({ default: binaryen }) => {
+      const memoryBase = Math.pow(2, cellSize);
+
       let position = 0;
 
       const module = new binaryen.Module();
 
       const constE = (value) => module.i32.const(value);
 
-      const loadMemoryE = (n) =>
-        module.i32.load16_u(
-          0,
-          0,
-          module.i32.add(module.local.get(0, binaryen.i32), constE(n))
-        );
+      const loadMemoryE = (n) => {
+        const targetFunc =
+          cellSize === 0
+            ? module.i32.load8_u
+            : cellSize === 1
+            ? module.i32.load16_u
+            : module.i32.load;
 
-      const storeMemoryE = (n, value) =>
-        n == 0
-          ? module.i32.store16(0, 0, module.local.get(0, binaryen.i32), value)
-          : module.i32.store16(
+        return n === 0
+          ? targetFunc(0, cellSize, module.local.get(0, binaryen.i32))
+          : targetFunc(
               0,
+              cellSize,
+              module.i32.add(
+                module.local.get(0, binaryen.i32),
+                constE(n * memoryBase)
+              )
+            );
+      };
+
+      const storeMemoryE = (n, value) => {
+        const targetFunc =
+          cellSize === 0
+            ? module.i32.store8
+            : cellSize === 1
+            ? module.i32.store16
+            : module.i32.store;
+
+        return n === 0
+          ? targetFunc(0, cellSize, module.local.get(0, binaryen.i32), value)
+          : targetFunc(
               0,
-              module.i32.add(module.local.get(0, binaryen.i32), constE(n)),
+              cellSize,
+              module.i32.add(
+                module.local.get(0, binaryen.i32),
+                constE(n * memoryBase)
+              ),
               value
             );
-
-      const logE = (value) => module.call("log", [value], binaryen.none);
+      };
 
       const outputE = (value) => module.call("output", [value], binaryen.none);
 
@@ -86,7 +79,6 @@ exports.transpile_ =
 
       const go = (operated) => {
         let pointer = 0;
-        let transpiled = "";
         let expressions = []; //: binaryen.Expression[]
         let stack = new Map();
 
@@ -242,6 +234,7 @@ exports.transpile_ =
                   for (const entry of loop.stack.entries()) {
                     const [n, v] = entry;
                     if (v.type === "Set") {
+                      expressions.push(...use(pointer + n));
                       expressions.push(
                         module.if(
                           loadMemoryE(pointer),
@@ -274,7 +267,8 @@ exports.transpile_ =
               } else {
                 // 最適化なし
                 expressions.push(...useAll());
-                expressions.push(addE(0, constE(pointer)));
+                pointer !== 0 &&
+                  expressions.push(addE(0, constE(pointer * memoryBase)));
                 pointer = 0;
                 stack.clear();
                 operated.clear();
@@ -301,7 +295,9 @@ exports.transpile_ =
                       module.block(null, [
                         ...loop.expressions,
                         ...result,
-                        addE(0, constE(loop.pointer)),
+                        ...(loop.pointer !== 0
+                          ? [addE(0, constE(loop.pointer * memoryBase))]
+                          : []),
                         module.br(`loop${position}`),
                       ])
                     )
@@ -313,7 +309,7 @@ exports.transpile_ =
           position++;
         }
 
-        return { pointer, transpiled, stack, expressions };
+        return { pointer, stack, expressions };
       };
 
       const res = go(
@@ -350,7 +346,7 @@ exports.transpile_ =
           binaryen.i32, // temp .. 0
         ],
         module.block(null, [
-          module.local.set(0, constE(0)),
+          module.local.set(0, constE(128)),
           ...res.expressions,
           module.return(),
         ])
@@ -358,10 +354,11 @@ exports.transpile_ =
 
       module.addFunctionExport("main", "main");
       module.setMemory(2, 2); // {env: {memory: メモリ}} で渡す
-
-      // module.optimize();
+      module.addMemoryExport("0", "memory");
 
       console.log(module.emitText());
+
+      module.optimize();
 
       if (!module.validate()) throw new Error("validation error");
 
