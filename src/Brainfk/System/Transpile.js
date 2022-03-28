@@ -317,13 +317,6 @@ exports.transpile_ =
       );
 
       module.addFunctionImport(
-        "log",
-        "env",
-        "log",
-        binaryen.i32,
-        binaryen.none
-      );
-      module.addFunctionImport(
         "output",
         "env",
         "output",
@@ -364,5 +357,5 @@ exports.transpile_ =
 
       const wasmData = module.emitBinary();
 
-      return new WebAssembly.Module(wasmData);
+      return wasmData;
     });
