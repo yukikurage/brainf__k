@@ -349,8 +349,6 @@ exports.transpile_ =
       module.setMemory(2, 2); // {env: {memory: メモリ}} で渡す
       module.addMemoryExport("0", "memory");
 
-      console.log(module.emitText());
-
       module.optimize();
 
       if (!module.validate()) throw new Error("validation error");
