@@ -73,9 +73,9 @@ exports.transpile_ =
             );
       };
 
-      const outputE = (value) => module.call("output", [value], binaryen.none);
+      const outputE = (value) => module.call("o", [value], binaryen.none);
 
-      const inputE = (value) => module.call("input", [value], binaryen.i32);
+      const inputE = (value) => module.call("i", [value], binaryen.i32);
 
       /**
        * @param {number} target
@@ -289,7 +289,7 @@ exports.transpile_ =
                 }
                 expressions.push(
                   module.loop(
-                    `loop${position}`,
+                    `l${position}`,
                     module.if(
                       loadMemoryE(0),
                       module.block(null, [
@@ -298,11 +298,13 @@ exports.transpile_ =
                         ...(loop.pointer !== 0
                           ? [addE(0, constE(loop.pointer * memoryBase))]
                           : []),
-                        module.br(`loop${position}`),
+                        module.br(`l${position}`),
                       ])
                     )
                   )
                 );
+
+                operated.set(pointer, 0);
               }
             }
           }
@@ -317,14 +319,14 @@ exports.transpile_ =
       );
 
       module.addFunctionImport(
-        "output",
+        "o",
         "env",
         "output",
         binaryen.i32,
         binaryen.none
       ); // {env: {output: (data: i32) => void}} で渡す
       module.addFunctionImport(
-        "input",
+        "i",
         "env",
         "input",
         binaryen.i32,
