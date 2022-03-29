@@ -73,9 +73,9 @@ exports.transpile_ =
             );
       };
 
-      const outputE = (value) => module.call("o", [value], binaryen.none);
+      const outputE = (value) => module.call("output", [value], binaryen.none);
 
-      const inputE = (value) => module.call("i", [value], binaryen.i32);
+      const inputE = (value) => module.call("input", [value], binaryen.i32);
 
       /**
        * @param {number} target
@@ -319,14 +319,14 @@ exports.transpile_ =
       );
 
       module.addFunctionImport(
-        "o",
+        "output",
         "env",
         "output",
         binaryen.i32,
         binaryen.none
       ); // {env: {output: (data: i32) => void}} で渡す
       module.addFunctionImport(
-        "i",
+        "input",
         "env",
         "input",
         binaryen.i32,
