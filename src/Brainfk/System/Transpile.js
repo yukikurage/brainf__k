@@ -16,11 +16,12 @@ const append = (op1, op2) => {
     return { type: "Set", value: op2.value };
   }
 };
+
 /**
  * memorySize: number
  * cellSize: 0 | 1 | 2
  */
-exports.transpile_ =
+exports.transpileImpl =
   ({ memorySize, cellSize }) =>
   (code) =>
     binaryenPromise.then(({ default: binaryen }) => {
@@ -42,6 +43,12 @@ exports.transpile_ =
 
         return n === 0
           ? targetFunc(0, cellSize, module.local.get(0, binaryen.i32))
+          : n > 0
+          ? targetFunc(
+              n * memoryBase,
+              cellSize,
+              module.local.get(0, binaryen.i32)
+            )
           : targetFunc(
               0,
               cellSize,
@@ -62,6 +69,13 @@ exports.transpile_ =
 
         return n === 0
           ? targetFunc(0, cellSize, module.local.get(0, binaryen.i32), value)
+          : n > 0
+          ? targetFunc(
+              n * memoryBase,
+              cellSize,
+              module.local.get(0, binaryen.i32),
+              value
+            )
           : targetFunc(
               0,
               cellSize,
@@ -98,17 +112,24 @@ exports.transpile_ =
           if (res === undefined) {
             return [];
           }
+          const kv = operated.get(n);
           let result = [];
           if (res.type === "Add") {
-            result = [
-              storeMemoryE(
-                n,
-                module.i32.add(constE(res.value), loadMemoryE(n))
-              ),
-            ];
+            result =
+              res.value === 0
+                ? []
+                : kv !== undefined
+                ? [storeMemoryE(n, constE(res.value + kv))]
+                : [
+                    storeMemoryE(
+                      n,
+                      module.i32.add(constE(res.value), loadMemoryE(n))
+                    ),
+                  ];
           } else {
             // Set
-            result = [storeMemoryE(n, constE(res.value))];
+            result =
+              kv === res.value ? [] : [storeMemoryE(n, constE(res.value))];
           }
 
           stack.delete(n);
@@ -126,14 +147,22 @@ exports.transpile_ =
           let result = [];
           for (const entry of stack.entries()) {
             const [n, v] = entry;
+            const kv = operated.get(n);
             if (v.type === "Add") {
-              result.push(
-                storeMemoryE(n, module.i32.add(constE(v.value), loadMemoryE(n)))
-              );
+              v.value !== 0 && kv !== undefined
+                ? result.push(storeMemoryE(n, constE(v.value + kv)))
+                : result.push(
+                    storeMemoryE(
+                      n,
+                      module.i32.add(constE(v.value), loadMemoryE(n))
+                    )
+                  );
             } else {
-              result.push(storeMemoryE(n, constE(v.value)));
+              kv !== v.value && result.push(storeMemoryE(n, constE(v.value)));
             }
           }
+          operated.clear();
+
           return result;
         };
 
@@ -247,18 +276,35 @@ exports.transpile_ =
                     } else {
                       //Add
                       expressions.push(...use(pointer + n));
-                      expressions.push(
-                        storeMemoryE(
-                          pointer + n,
-                          module.i32.add(
-                            loadMemoryE(pointer + n),
-                            module.i32.mul(
-                              constE(v.value),
-                              loadMemoryE(pointer)
-                            )
-                          )
-                        )
-                      );
+                      v.value !== 0 &&
+                        expressions.push(
+                          v.value === 1
+                            ? storeMemoryE(
+                                pointer + n,
+                                module.i32.add(
+                                  loadMemoryE(pointer + n),
+                                  loadMemoryE(pointer)
+                                )
+                              )
+                            : v.value === -1
+                            ? storeMemoryE(
+                                pointer + n,
+                                module.i32.sub(
+                                  loadMemoryE(pointer + n),
+                                  loadMemoryE(pointer)
+                                )
+                              )
+                            : storeMemoryE(
+                                pointer + n,
+                                module.i32.add(
+                                  loadMemoryE(pointer + n),
+                                  module.i32.mul(
+                                    constE(v.value),
+                                    loadMemoryE(pointer)
+                                  )
+                                )
+                              )
+                        );
                     }
                     operated.set(pointer + n, undefined);
                   }
@@ -271,7 +317,6 @@ exports.transpile_ =
                   expressions.push(addE(0, constE(pointer * memoryBase)));
                 pointer = 0;
                 stack.clear();
-                operated.clear();
 
                 let result = [];
                 for (const entry of loop.stack.entries()) {
@@ -284,6 +329,7 @@ exports.transpile_ =
                       )
                     );
                   } else {
+                    // Set
                     result.push(storeMemoryE(n, constE(v.value)));
                   }
                 }
@@ -348,10 +394,12 @@ exports.transpile_ =
       );
 
       module.addFunctionExport("main", "main");
-      module.setMemory(2, 2); // {env: {memory: メモリ}} で渡す
+      module.setMemory(2, 2);
       module.addMemoryExport("0", "memory");
 
       module.optimize();
+
+      console.log(module.emitText());
 
       if (!module.validate()) throw new Error("validation error");
 

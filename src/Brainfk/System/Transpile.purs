@@ -36,7 +36,7 @@ defaultSettings =
   , cellSize: Bit8
   }
 
-foreign import transpile_
+foreign import transpileImpl
   :: forall r
    . { memorySize :: Number, cellSize :: Int | r }
   -> String
@@ -44,7 +44,7 @@ foreign import transpile_
 
 transpile
   :: forall r. Record (Settings r) -> String -> Aff Transpiled
-transpile settings code = toAff $ transpile_
+transpile settings code = toAff $ transpileImpl
   { memorySize: toNumber settings.memorySize
   , cellSize: cellSizeToAlignment settings.cellSize
   }
