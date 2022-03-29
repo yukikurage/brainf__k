@@ -49,7 +49,7 @@ exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
     },
   };
 
-  worker.postMessage({input, compiled});
+  worker.postMessage({input, compiled}, compiled.buffer);
 
   return res;
 };

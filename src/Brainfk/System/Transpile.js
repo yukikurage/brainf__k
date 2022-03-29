@@ -77,21 +77,21 @@ exports.transpile_ =
 
       const inputE = (value) => module.call("input", [value], binaryen.i32);
 
+      /**
+       * @param {number} target
+       * @param {Expression} value
+       * @returns
+       */
+      const addE = (target, value) =>
+        module.local.set(
+          target,
+          module.i32.add(module.local.get(target, binaryen.i32), value)
+        );
+
       const go = (operated) => {
         let pointer = 0;
         let expressions = []; //: binaryen.Expression[]
         let stack = new Map();
-
-        /**
-         * @param {number} target
-         * @param {Expression} value
-         * @returns
-         */
-        const addE = (target, value) =>
-          module.local.set(
-            target,
-            module.i32.add(module.local.get(target, binaryen.i32), value)
-          );
 
         const use = (n) => {
           const res = stack.get(n);
