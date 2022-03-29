@@ -399,8 +399,6 @@ exports.transpileImpl =
 
       module.optimize();
 
-      console.log(module.emitText());
-
       if (!module.validate()) throw new Error("validation error");
 
       const wasmData = module.emitBinary();
