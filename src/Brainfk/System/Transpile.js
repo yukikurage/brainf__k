@@ -347,10 +347,12 @@ exports.transpile_ =
         binaryen.none,
         binaryen.none,
         [
-          binaryen.i32, // temp .. 0
+          binaryen.i32, // pointer .. 0
+          binaryen.i32, // temp .. 1
         ],
         module.block(null, [
           module.local.set(0, constE(0)),
+          module.local.set(1, constE(0)),
           ...res.expressions,
           module.return(),
         ])
