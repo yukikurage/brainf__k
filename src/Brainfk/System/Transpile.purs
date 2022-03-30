@@ -19,10 +19,10 @@ data CellSize = Bit8 | Bit16 | Bit32
 derive instance Eq CellSize
 derive instance Ord CellSize
 
-cellSizeToString :: CellSize -> String
-cellSizeToString Bit8 = "8"
-cellSizeToString Bit16 = "16"
-cellSizeToString Bit32 = "32"
+cellSizeToAlignment :: CellSize -> Int
+cellSizeToAlignment Bit8 = 0
+cellSizeToAlignment Bit16 = 1
+cellSizeToAlignment Bit32 = 2
 
 type Settings r =
   ( memorySize :: Int
@@ -38,7 +38,7 @@ defaultSettings =
 
 foreign import transpile_
   :: forall r
-   . { memorySize :: Number, cellSize :: String | r }
+   . { memorySize :: Number, cellSize :: Int | r }
   -> String
   -> Promise Transpiled
 
@@ -46,6 +46,6 @@ transpile
   :: forall r. Record (Settings r) -> String -> Aff Transpiled
 transpile settings code = toAff $ transpile_
   { memorySize: toNumber settings.memorySize
-  , cellSize: cellSizeToString settings.cellSize
+  , cellSize: cellSizeToAlignment settings.cellSize
   }
   code

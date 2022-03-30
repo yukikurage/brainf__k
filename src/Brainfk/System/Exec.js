@@ -1,35 +1,11 @@
 "use strict";
 
 exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
-  let output = "";
+  const worker = new Worker('./ExecWorker.js');
 
-  let i = 0;
+  let output = ""
 
-  const instance = new WebAssembly.Instance(compiled, {
-    env: {
-      log: (value) => {
-        console.log(value);
-      },
-      output: (value) => {
-        output += String.fromCodePoint(value);
-      },
-      input: (value) => {
-        if (i < input.length) return input.codePointAt(i++);
-        return value;
-      },
-    },
-  });
-
-  // const workerContent = func;
-
-  // console.log(workerContent);
-
-  // const workerUrl = URL.createObjectURL(new Blob([workerContent]));
-
-  // const worker = new Worker(workerUrl);
-
-  // let terminateCallbackFunc = () => {};
-  // const terminateCallback = () => terminateCallbackFunc();
+  let terminateCallback = () => {};
 
   const res = {
     getOutput: () => {
@@ -38,48 +14,42 @@ exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
       return res;
     },
     waitFinish: new Promise((resolve) => {
-      // worker.addEventListener(
-      //   "message",
-      //   (e) => {
-      //     if (e.data === "f") {
-      //       worker.terminate();
-      //       URL.revokeObjectURL(workerUrl);
-      //       resolve(nothing);
-      //     } else {
-      //       try {
-      //         output += String.fromCodePoint(e.data);
-      //       } catch (e) {
-      //         resolve(just(e));
-      //         worker.terminate();
-      //         URL.revokeObjectURL(workerUrl);
-      //       }
-      //     }
-      //   },
-      //   false
-      // );
-      // worker.addEventListener(
-      //   "error",
-      //   (e) => {
-      //     resolve(just(e));
-      //     worker.terminate();
-      //     URL.revokeObjectURL(workerUrl);
-      //   },
-      //   false
-      // );
-      // terminateCallbackFunc = () => {
-      //   worker.terminate();
-      //   URL.revokeObjectURL(workerUrl);
-      //   resolve(just(new Error("Process terminated")));
-      // };
-      resolve(nothing);
+      worker.addEventListener(
+        "message",
+        (e) => {
+          if (e.data === "f") {
+            worker.terminate();
+            resolve(nothing);
+          } else {
+            try {
+              output += String.fromCodePoint(e.data);
+            } catch (e) {
+              resolve(just(e));
+              worker.terminate();
+            }
+          }
+        },
+        false
+      );
+      worker.addEventListener(
+        "error",
+        (e) => {
+          resolve(just(e));
+          worker.terminate();
+        },
+        false
+      );
+      terminateCallback = () => {
+        worker.terminate();
+        resolve(just(new Error("Process terminated")));
+      };
     }),
     stop: () => {
-      // terminateCallback();
+      terminateCallback();
     },
   };
 
-  instance.exports.main();
+  worker.postMessage({input, compiled});
 
-  // worker.postMessage("");
   return res;
 };
