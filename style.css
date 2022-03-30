@@ -729,11 +729,6 @@ Ensure the default browser behavior of the `hidden` attribute.
   opacity: 0;
 }
 
-.outline-none {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-}
-
 .outline-zinc-300 {
   outline-color: #d4d4d8;
 }
