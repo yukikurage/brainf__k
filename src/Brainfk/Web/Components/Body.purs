@@ -24,7 +24,7 @@ import Halogen (Component, RefLabel(..), liftAff, liftEffect)
 import Halogen.HTML (button, text)
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onValueInput)
-import Halogen.HTML.Properties (InputType(..), checked, disabled, href, name, rel, target, type_, value)
+import Halogen.HTML.Properties (InputType(..), checked, disabled, href, name, readOnly, ref, rel, target, type_, value)
 import Halogen.Hooks (fork, getRef, kill, modify_, put, useState)
 import Halogen.Hooks as Hooks
 import Web.DOM.Element (scrollHeight, setScrollTop)
@@ -191,30 +191,25 @@ component = Hooks.component \_ _ -> Hooks.do
             [ css "flex flex-row flex-grow" ]
             [ HH.div [ css "h-full flex-[8] flex flex-col p-1" ]
                 [ textareaBase
-                    { value: codeValue
-                    , onValueInput: put codeValueId
-                    , ref: RefLabel "CodeRef"
-                    , readOnly: false
-                    }
+                    [ value codeValue
+                    , onValueInput $ put codeValueId
+                    ]
                 ]
             , HH.div [ css "h-full flex-[7] flex flex-col" ]
                 [ HH.div [ css "text-xl p-1" ] [ text "Input" ]
                 , HH.div [ css "w-full flex-[2] p-1" ]
                     [ textareaBase
-                        { value: inputValue
-                        , onValueInput: put inputValueId
-                        , ref: RefLabel "InputRef"
-                        , readOnly: false
-                        }
+                        [ value inputValue
+                        , onValueInput $ put inputValueId
+                        ]
                     ]
                 , HH.div [ css "text-xl p-1" ] [ text "Output" ]
                 , HH.div [ css "w-full flex-[7] p-1" ]
                     [ textareaBase
-                        { value: outputValue
-                        , onValueInput: const $ pure unit
-                        , ref: RefLabel "OutputRef"
-                        , readOnly: true
-                        }
+                        [ value outputValue
+                        , ref $ RefLabel "OutputRef"
+                        , readOnly true
+                        ]
                     ]
                 ]
             ]
