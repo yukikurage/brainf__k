@@ -14,7 +14,7 @@ addEventListener(
           postMessage(value);
         },
         input: (value) => {
-          if (i < input.length) return e.input.codePointAt(i++);
+          if (i < input.length) return input.codePointAt(i++);
           return value;
         },
       },

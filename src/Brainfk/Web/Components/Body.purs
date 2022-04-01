@@ -67,7 +67,7 @@ component = Hooks.component \_ _ -> Hooks.do
       transpileBeforeTime <- liftEffect nowTime
       transpiled <- liftAff $ transpile settings codeValue
       transpileAfterTime <- liftEffect nowTime
-      put transpileTimeId $ diffS transpileAfterTime transpileBeforeTime
+      put transpileTimeId $ transpileAfterTime `diffS` transpileBeforeTime
 
       execBeforeTime <- liftEffect nowTime
 
@@ -97,7 +97,9 @@ component = Hooks.component \_ _ -> Hooks.do
           ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
               (prev <> output)
           )
+
         autoScroll
+
         put isRunningId false
         execAfterTime <- liftEffect nowTime
 
