@@ -3,6 +3,9 @@ module Brainfk.Web.Util where
 import Prelude
 
 import DOM.HTML.Indexed.WrapValue (WrapValue)
+import Data.Int (floor)
+import Data.Time (Time, diff)
+import Data.Time.Duration (Milliseconds(..))
 import Halogen.HTML (ClassName(..), HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties (class_)
@@ -38,3 +41,10 @@ modifyRecord
   -> HookM m Unit
 modifyRecord stateId f = Hooks.modify_ stateId \prev -> Record.merge (f prev)
   prev
+
+diffS :: Time -> Time -> Int
+diffS a b =
+  let
+    Milliseconds d = diff a b
+  in
+    floor d
