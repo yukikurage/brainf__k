@@ -277,7 +277,8 @@ exports.transpileImpl =
                       //Add
                       expressions.push(...use(pointer + n));
                       v.value !== 0 &&
-                        expressions.push(
+                        expressions.push(module.if(
+                          loadMemoryE(pointer),
                           v.value === 1
                             ? storeMemoryE(
                                 pointer + n,
@@ -304,6 +305,7 @@ exports.transpileImpl =
                                   )
                                 )
                               )
+                        )
                         );
                     }
                     operated.set(pointer + n, undefined);
