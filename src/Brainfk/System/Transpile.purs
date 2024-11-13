@@ -8,7 +8,6 @@ module Brainfk.System.Transpile
 
 import Prelude
 
-
 import Data.Int (toNumber)
 import Effect (Effect)
 import Effect.Aff (Aff)

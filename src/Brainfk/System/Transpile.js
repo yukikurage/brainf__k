@@ -1,6 +1,6 @@
 "use strict";
 
-import binaryen from "https://cdn.jsdelivr.net/gh/AssemblyScript/binaryen.js@120.0.0/index.js";
+import binaryen from "binaryen";
 
 const append = (op1, op2) => {
   if (op1.type === "Add" && op2.type === "Add") {
@@ -32,7 +32,7 @@ export const transpileImpl =
 
       module.setMemory(2, 2);
       module.addMemoryExport("0", "memory");
-      
+
       const constE = (value) => module.i32.const(value);
 
       const loadMemoryE = (n) => {
