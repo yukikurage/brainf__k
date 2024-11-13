@@ -9,7 +9,7 @@
     "test": "run-s test:*",
     "bundle:spago": "node esbuild.js",
     "bundle:tailwind": "npx tailwindcss -i ./tailwind.css -o ./public/style.css",
-    "bundle": "run-s bundle:spago bundle:webpack bundle:tailwind",
+    "bundle": "run-s bundle:*",
     "watch:spago": "node esbuildWatch.js",
     "watch:tailwind": "npx tailwindcss -i ./tailwind.css -o ./public/style.css -w",
     "watch:live-server": "cd public && npx live-server --port=8080",
