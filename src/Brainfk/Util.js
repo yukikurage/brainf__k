@@ -30,4 +30,4 @@ if (typeof window !== "undefined") {
   _setZeroTimeout = (f) => setTimeout(f, 0);
 }
 
-exports.setZeroTimeout = (f) => () => _setZeroTimeout(f);
+export const setZeroTimeout = (f) => () => _setZeroTimeout(f);

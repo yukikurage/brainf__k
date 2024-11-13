@@ -80,7 +80,7 @@ component = Hooks.component \_ _ -> Hooks.do
       updateForkId <- fork $ forever do
         output <- liftEffect getOutput
         modify_ outputValueId
-          ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+          ( \prev -> slice (-100000) (-1)
               (prev <> output)
           )
 
@@ -94,7 +94,7 @@ component = Hooks.component \_ _ -> Hooks.do
         kill updateForkId
         output <- liftEffect getOutput
         modify_ outputValueId
-          ( \prev -> fromMaybe (prev <> output) $ slice (-100000) (-1)
+          ( \prev ->  slice (-100000) (-1)
               (prev <> output)
           )
 

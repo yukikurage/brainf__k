@@ -1,0 +1,34 @@
+package:
+  name: brain-fuck
+  dependencies:
+    - "aff"
+    -  "aff-promise"
+    -  "arrays"
+    -  "console"
+    -  "datetime"
+    -  "dom-indexed"
+    -  "effect"
+    -  "either"
+    -  "exceptions"
+    -  "foldable-traversable"
+    -  "halogen"
+    -  "halogen-hooks"
+    -  "integers"
+    -  "lists"
+    -  "maybe"
+    -  "now"
+    -  "prelude"
+    -  "record"
+    -  "strings"
+    -  "tailrec"
+    -  "tuples"
+    -  "web-dom"
+    -  "web-events"
+    -  "web-uievents"
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 61.0.1
+  extraPackages: {}

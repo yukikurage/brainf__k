@@ -1,31 +1,29 @@
 {
   "name": "brainf__k",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "brainf**k interpreter by yukikurage",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test:spago": "npx spago test",
     "test": "run-s test:*",
-    "bundle:spago": "npx spago build",
-    "bundle:webpack": "npx webpack --mode production",
+    "bundle:spago": "node esbuild.js",
     "bundle:tailwind": "npx tailwindcss -i ./tailwind.css -o ./public/style.css",
     "bundle": "run-s bundle:spago bundle:webpack bundle:tailwind",
-    "watch:webpack": "npx webpack --mode development --watch",
+    "watch:spago": "node esbuildWatch.js",
     "watch:tailwind": "npx tailwindcss -i ./tailwind.css -o ./public/style.css -w",
     "watch:live-server": "cd public && npx live-server --port=8080",
     "watch": "run-p watch:*"
   },
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "@tailwindcss/jit": "^0.1.18",
-    "binaryen": "^106.0.0",
-    "live-server": "^1.2.1",
+  "dependencies": {
+    "esbuild": "^0.24.0",
+    "live-server": "^1.2.2",
     "npm-run-all": "^4.1.5",
-    "purescript": "^0.14.7",
-    "spago": "^0.20.7",
-    "tailwindcss": "^3.0.23",
-    "webpack": "^5.70.0",
-    "webpack-cli": "^4.9.2"
+    "purescript": "^0.15.15",
+    "purs-tidy": "^0.11.0",
+    "spago": "^0.93.41",
+    "tailwindcss": "^3.4.14"
   }
 }

@@ -1,6 +1,6 @@
 "use strict";
 
-const binaryenPromise = require("binaryen");
+import binaryen from "https://cdn.jsdelivr.net/gh/AssemblyScript/binaryen.js@120.0.0/index.js";
 
 const append = (op1, op2) => {
   if (op1.type === "Add" && op2.type === "Add") {
@@ -21,16 +21,18 @@ const append = (op1, op2) => {
  * memorySize: number
  * cellSize: 0 | 1 | 2
  */
-exports.transpileImpl =
+export const transpileImpl =
   ({ memorySize, cellSize }) =>
-  (code) =>
-    binaryenPromise.then(({ default: binaryen }) => {
+  (code) => () => {
       const memoryBase = Math.pow(2, cellSize);
 
       let position = 0;
 
       const module = new binaryen.Module();
 
+      module.setMemory(2, 2);
+      module.addMemoryExport("0", "memory");
+      
       const constE = (value) => module.i32.const(value);
 
       const loadMemoryE = (n) => {
@@ -396,8 +398,6 @@ exports.transpileImpl =
       );
 
       module.addFunctionExport("main", "main");
-      module.setMemory(2, 2);
-      module.addMemoryExport("0", "memory");
 
       module.optimize();
 
@@ -406,4 +406,4 @@ exports.transpileImpl =
       const wasmData = module.emitBinary();
 
       return wasmData;
-    });
+    };

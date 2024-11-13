@@ -1,3 +1,5 @@
-const Main = require("./output/Main/index.js")
+import { main } from "./output/Main/index.js"
 
-Main.main()
+console.log("Starting App...")
+
+main()

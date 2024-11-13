@@ -1,6 +1,6 @@
 "use strict";
 
-exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
+export const exec_ = (just) => (nothing) => (input) => (compiled) => () => {
   const worker = new Worker('./ExecWorker.js');
 
   let output = ""
@@ -49,7 +49,9 @@ exports.exec_ = (just) => (nothing) => (input) => (compiled) => () => {
     },
   };
 
-  worker.postMessage({input, compiled}, compiled.buffer);
+  console.log(typeof compiled.buffer);
+
+  worker.postMessage({input, compiled}, [compiled.buffer]);
 
   return res;
 };

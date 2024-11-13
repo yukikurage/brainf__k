@@ -8,9 +8,12 @@ module Brainfk.System.Transpile
 
 import Prelude
 
-import Control.Promise (Promise, toAff)
+
 import Data.Int (toNumber)
+import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 
 foreign import data Transpiled :: Type
 
@@ -40,11 +43,11 @@ foreign import transpileImpl
   :: forall r
    . { memorySize :: Number, cellSize :: Int | r }
   -> String
-  -> Promise Transpiled
+  -> Effect Transpiled
 
 transpile
   :: forall r. Record (Settings r) -> String -> Aff Transpiled
-transpile settings code = toAff $ transpileImpl
+transpile settings code = liftEffect $ transpileImpl
   { memorySize: toNumber settings.memorySize
   , cellSize: cellSizeToAlignment settings.cellSize
   }
